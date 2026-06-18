@@ -10,6 +10,7 @@ interface SubTopicListItemProps {
   compact?: boolean;
   dragHandleProps?: Record<string, unknown>;
   actions?: React.ReactNode;
+  onClick?: () => void;
 }
 
 const masteryConfig: Record<MasteryLevel, { label: string; className: string }> = {
@@ -20,7 +21,7 @@ const masteryConfig: Record<MasteryLevel, { label: string; className: string }> 
   MASTERED: { label: "Mastered", className: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400" },
 };
 
-export function SubTopicListItem({ subtopic, compact, dragHandleProps, actions }: SubTopicListItemProps) {
+export function SubTopicListItem({ subtopic, compact, dragHandleProps, actions, onClick }: SubTopicListItemProps) {
   const mastery = masteryConfig[subtopic.mastery_level];
   const accuracy =
     subtopic.questions_solved > 0
@@ -30,7 +31,7 @@ export function SubTopicListItem({ subtopic, compact, dragHandleProps, actions }
 
   if (compact) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2 transition-all hover:shadow-sm hover:border-primary/30">
+      <div onClick={onClick} className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2 transition-all hover:shadow-sm hover:border-primary/30 cursor-pointer">
         {dragHandleProps && (
           <div {...dragHandleProps} className="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing">
             <GripVertical className="h-4 w-4" />
@@ -50,7 +51,7 @@ export function SubTopicListItem({ subtopic, compact, dragHandleProps, actions }
   }
 
   return (
-    <div className="flex items-center gap-4 rounded-xl border bg-card p-4 transition-all hover:shadow-md hover:border-primary/30">
+    <div onClick={onClick} className="flex items-center gap-4 rounded-xl border bg-card p-4 transition-all hover:shadow-md hover:border-primary/30 cursor-pointer">
       {dragHandleProps && (
         <div {...dragHandleProps} className="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing">
           <GripVertical className="h-4 w-4" />

@@ -33,6 +33,7 @@ import { EditDialog } from "@/components/edit-dialog";
 import { ReorderDialog } from "@/components/reorder-dialog";
 import { ItemActionsMenu } from "@/components/item-actions-menu";
 import { ViewModeSwitcher, ViewMode } from "@/components/view-mode-switcher";
+import { SubtopicDetailModal } from "@/components/subtopic-detail-modal";
 import { TopicGridSkeleton, SubtopicGridSkeleton } from "@/components/page-skeleton";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuthStore } from "@/stores/auth-store";
@@ -210,6 +211,7 @@ function SortableSubtopicItem({
   subtopic,
   index,
   viewMode,
+  onClick,
   onEdit,
   onDelete,
   onDuplicate,
@@ -218,6 +220,7 @@ function SortableSubtopicItem({
   subtopic: SubTopic;
   index: number;
   viewMode: ViewMode;
+  onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -274,7 +277,9 @@ function SortableSubtopicItem({
           <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/subtopic:opacity-100 transition-opacity">
             {actionsNode}
           </div>
-          <SubTopicCard subtopic={subtopic} />
+          <div onClick={onClick} className="cursor-pointer">
+            <SubTopicCard subtopic={subtopic} />
+          </div>
         </div>
       </div>
     );
@@ -287,6 +292,7 @@ function SortableSubtopicItem({
         compact={viewMode === "compact"}
         dragHandleProps={dragHandleProps}
         actions={actionsNode}
+        onClick={onClick}
       />
     </div>
   );
@@ -308,6 +314,10 @@ function SubjectDetailContent() {
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
   const [editSubtopicOpen, setEditSubtopicOpen] = useState(false);
   const [editingSubtopic, setEditingSubtopic] = useState<SubTopic | null>(null);
+
+  // Detail modal state
+  const [detailSubtopic, setDetailSubtopic] = useState<SubTopic | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   // Reorder dialog state
   const [reorderTopicOpen, setReorderTopicOpen] = useState(false);
@@ -477,6 +487,12 @@ function SubjectDetailContent() {
     const reordered = moved.map((t, i) => ({ ...t, order: i + 1 }));
     setTopics(reordered);
     await reorderTopics(subjectId, reordered.map((t) => t.id));
+  };
+
+  // Subtopic detail modal
+  const handleOpenDetail = (subtopic: SubTopic) => {
+    setDetailSubtopic(subtopic);
+    setDetailOpen(true);
   };
 
   // Subtopic actions
@@ -741,6 +757,7 @@ function SubjectDetailContent() {
                                 subtopic={subtopic}
                                 index={i}
                                 viewMode={viewMode}
+                                onClick={() => handleOpenDetail(subtopic)}
                                 onEdit={() => handleEditSubtopic(subtopic)}
                                 onDelete={() => handleDeleteSubtopic(subtopic)}
                                 onDuplicate={() => handleDuplicateSubtopic(subtopic)}
@@ -820,6 +837,15 @@ function SubjectDetailContent() {
           open={reorderSubtopicOpen}
           onOpenChange={setReorderSubtopicOpen}
           onSubmit={handleReorderSubtopicSubmit}
+        />
+      )}
+
+      {/* Subtopic Detail Modal */}
+      {detailSubtopic && (
+        <SubtopicDetailModal
+          subtopic={detailSubtopic}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
         />
       )}
     </div>
