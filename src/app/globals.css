@@ -156,6 +156,16 @@
   }
 }
 
+/* ── iOS Safari canvas fix ── */
+
+canvas {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  touch-action: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ── Animations ── */
 
 @keyframes fade-in-up {

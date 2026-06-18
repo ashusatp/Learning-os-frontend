@@ -791,6 +791,20 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
     }
   }, [elements, redraw]);
 
+  // ── iOS: prevent default touch behaviors on canvas only ──
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const prevent = (e: Event) => e.preventDefault();
+    canvas.addEventListener("touchstart", prevent, { passive: false });
+    canvas.addEventListener("contextmenu", prevent);
+    return () => {
+      canvas.removeEventListener("touchstart", prevent);
+      canvas.removeEventListener("contextmenu", prevent);
+    };
+  }, []);
+
   // ── Theme toggle ──
 
   const handleThemeToggle = useCallback(() => {
@@ -839,6 +853,15 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
         if (toolbarPos) {
           setPenPos({ x: toolbarPos.x, y: toolbarPos.y });
         }
+      }
+
+      // Palm rejection: finger touch → always pan/scroll, never draw
+      if (e.pointerType === "touch") {
+        if (canvasMode !== "pages") {
+          setIsPanning(true);
+          panStart.current = { x: e.clientX, y: e.clientY, cx: 0, cy: camera.y };
+        }
+        return;
       }
 
       // Pan (vertical only, not in pages mode)
@@ -1209,6 +1232,7 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
 
   // Expand toolbar: open at pen's position
   const expandToolbar = useCallback(() => {
+    if (penRef.current) penRef.current.style.transform = "";
     if (penPos) {
       setToolbarPos({ x: penPos.x, y: penPos.y });
     }
@@ -1216,6 +1240,8 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
   }, [penPos]);
 
   // Pen drag
+  const penLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handlePenDragStart = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1228,11 +1254,21 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
     const currentY = penPos?.y ?? (penRect.top - containerRect.top);
     penDrag.current = { startX: e.clientX, startY: e.clientY, origX: currentX, origY: currentY, moved: false };
 
+    let dragEnabled = false;
+
     const handleMove = (ev: PointerEvent) => {
       if (!penDrag.current) return;
       const dx = ev.clientX - penDrag.current.startX;
       const dy = ev.clientY - penDrag.current.startY;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) penDrag.current.moved = true;
+      // Only start dragging after long press activates
+      if (!dragEnabled) {
+        // If finger moves too far before long press, cancel drag entirely
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+          if (penLongPressTimer.current) clearTimeout(penLongPressTimer.current);
+        }
+        return;
+      }
+      penDrag.current.moved = true;
       const nx = penDrag.current.origX + dx;
       const ny = penDrag.current.origY + dy;
       const maxX = containerRect.width - 48;
@@ -1240,13 +1276,22 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
       setPenPos({ x: Math.max(0, Math.min(maxX, nx)), y: Math.max(0, Math.min(maxY, ny)) });
     };
     const handleUp = () => {
+      if (penLongPressTimer.current) clearTimeout(penLongPressTimer.current);
+      if (pen) pen.style.transform = "";
       const wasDrag = penDrag.current?.moved;
       penDrag.current = null;
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
-      // Only expand if it was a click, not a drag
       if (!wasDrag) expandToolbar();
     };
+
+    // Long press: enable dragging after 200ms hold
+    penLongPressTimer.current = setTimeout(() => {
+      dragEnabled = true;
+      // Haptic-like visual feedback: slightly scale
+      if (pen) pen.style.transform = "scale(1.15)";
+    }, 200);
+
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleUp);
   }, [penPos, expandToolbar]);
@@ -1293,20 +1338,23 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
 
   return (
     <div
-      className={`relative h-full rounded-xl overflow-hidden border shadow-sm transition-colors duration-200 ${
+      className={`relative h-full rounded-xl overflow-hidden border shadow-sm transition-colors duration-200 select-none touch-none ${
         isDark ? "border-white/[0.06] bg-[#1e1e2e]" : "border-black/[0.06] bg-white"
       }`}
+      style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       {/* ── Canvas area (full size) ── */}
-      <div ref={containerRef} className={`absolute inset-0 ${cursor}`}>
+      <div ref={containerRef} className={`absolute inset-0 select-none ${cursor}`}>
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 touch-none"
+          className="absolute inset-0 touch-none select-none"
+          style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" } as React.CSSProperties}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
           onWheel={handleWheel}
+          onContextMenu={(e) => e.preventDefault()}
         />
 
         {/* Text input overlay */}

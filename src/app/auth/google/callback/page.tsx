@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 
-export default function GoogleCallbackPage() {
+function GoogleCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { googleAuth } = useAuthStore();
@@ -29,5 +29,22 @@ export default function GoogleCallbackPage() {
         <p className="text-sm text-muted-foreground">Signing you in...</p>
       </div>
     </div>
+  );
+}
+
+export default function GoogleCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Signing you in...</p>
+          </div>
+        </div>
+      }
+    >
+      <GoogleCallbackContent />
+    </Suspense>
   );
 }

@@ -105,7 +105,7 @@ export function SubtopicDetailModal({
 
       {/* Panel — NO css transforms, just flex centering */}
       <div
-        className={`relative z-10 flex flex-col bg-popover text-popover-foreground ring-1 ring-foreground/10 outline-none transition-all duration-150 ${
+        className={`relative z-10 flex flex-col bg-popover text-popover-foreground ring-1 ring-foreground/10 outline-none transition-all duration-150 select-none ${
           visible ? "opacity-100 scale-100" : "opacity-0 scale-100"
         } ${
           isFullscreen
