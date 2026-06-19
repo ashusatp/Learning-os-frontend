@@ -13,6 +13,8 @@ import {
   Maximize2,
   Minimize2,
   X,
+  Eye,
+  PencilLine,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -21,8 +23,10 @@ import { RichTextEditor } from "@/components/rich-text-editor";
 import { Whiteboard } from "@/components/whiteboard";
 import { SketchBoard } from "@/components/sketchboard";
 import { FileManager } from "@/components/file-manager";
+import { SubtopicNotesViewer } from "@/components/subtopic-notes-viewer";
 import { SubTopic, MasteryLevel } from "@/types";
 
+type Mode = "view" | "edit";
 type Tab = "notes" | "sketchboard" | "whiteboard" | "files";
 
 const tabsDef: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -51,9 +55,15 @@ export function SubtopicDetailModal({
   open,
   onOpenChange,
 }: SubtopicDetailModalProps) {
+  const [mode, setMode] = useState<Mode>("view");
   const [activeTab, setActiveTab] = useState<Tab>("notes");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [visible, setVisible] = useState(false);
+
+  // Local state for notes content (will connect to API later)
+  const [notesHtml, setNotesHtml] = useState("");
+  const [sketchDataUrl, setSketchDataUrl] = useState<string | undefined>();
+  const [whiteboardDataUrl, setWhiteboardDataUrl] = useState<string | undefined>();
 
   const mastery = masteryConfig[subtopic.mastery_level];
   const accuracy =
@@ -176,23 +186,56 @@ export function SubtopicDetailModal({
           </div>
         )}
 
-        {/* Tabs */}
+        {/* Mode toggle + Tabs */}
         <div className="flex items-center gap-1 px-6 pt-2 pb-0 shrink-0">
-          {tabsDef.map((tab) => (
+          {/* View / Edit toggle */}
+          <div className="flex items-center bg-muted rounded-lg p-0.5 mr-3">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 ${
-                activeTab === tab.id
-                  ? "border-primary text-primary bg-primary/5"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              onClick={() => setMode("view")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                mode === "view"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab.icon}
-              {tab.label}
+              <Eye className="h-3.5 w-3.5" />
+              View
             </button>
-          ))}
-          {(activeTab === "notes" || activeTab === "sketchboard" || activeTab === "whiteboard") && (
+            <button
+              onClick={() => setMode("edit")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                mode === "edit"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <PencilLine className="h-3.5 w-3.5" />
+              Edit
+            </button>
+          </div>
+
+          {/* Editor tabs — only in edit mode */}
+          {mode === "edit" && (
+            <>
+              {tabsDef.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 ${
+                    activeTab === tab.id
+                      ? "border-primary text-primary bg-primary/5"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* Fullscreen toggle */}
+          {(mode === "view" || activeTab === "notes" || activeTab === "sketchboard" || activeTab === "whiteboard") && (
             <button
               onClick={() => setIsFullscreen((f) => !f)}
               className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
@@ -208,27 +251,43 @@ export function SubtopicDetailModal({
           )}
         </div>
 
-        {/* Tab content */}
+        {/* Content */}
         <div className="flex-1 min-h-0 px-6 py-4 overflow-hidden">
-          {activeTab === "notes" && (
+          {mode === "view" ? (
             <div className="h-full">
-              <RichTextEditor placeholder="Write your study notes here..." />
+              <SubtopicNotesViewer
+                notesHtml={notesHtml}
+                sketchDataUrl={sketchDataUrl}
+                whiteboardDataUrl={whiteboardDataUrl}
+              />
             </div>
-          )}
-          {activeTab === "sketchboard" && (
-            <div className="h-full">
-              <SketchBoard />
-            </div>
-          )}
-          {activeTab === "whiteboard" && (
-            <div className="h-full">
-              <Whiteboard />
-            </div>
-          )}
-          {activeTab === "files" && (
-            <div className="h-full">
-              <FileManager />
-            </div>
+          ) : (
+            <>
+              {activeTab === "notes" && (
+                <div className="h-full">
+                  <RichTextEditor
+                    content={notesHtml}
+                    onChange={setNotesHtml}
+                    placeholder="Write your study notes here..."
+                  />
+                </div>
+              )}
+              {activeTab === "sketchboard" && (
+                <div className="h-full">
+                  <SketchBoard />
+                </div>
+              )}
+              {activeTab === "whiteboard" && (
+                <div className="h-full">
+                  <Whiteboard />
+                </div>
+              )}
+              {activeTab === "files" && (
+                <div className="h-full">
+                  <FileManager />
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
