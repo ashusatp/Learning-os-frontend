@@ -253,7 +253,7 @@ export function SubtopicDetailModal({
 
         {/* Content */}
         <div className="flex-1 min-h-0 px-6 py-4 overflow-hidden">
-          {mode === "view" ? (
+          {mode === "view" && (
             <div className="h-full">
               <SubtopicNotesViewer
                 notesHtml={notesHtml}
@@ -261,33 +261,31 @@ export function SubtopicDetailModal({
                 whiteboardDataUrl={whiteboardDataUrl}
               />
             </div>
-          ) : (
-            <>
-              {activeTab === "notes" && (
-                <div className="h-full">
-                  <RichTextEditor
-                    content={notesHtml}
-                    onChange={setNotesHtml}
-                    placeholder="Write your study notes here..."
-                  />
-                </div>
-              )}
-              {activeTab === "sketchboard" && (
-                <div className="h-full">
-                  <SketchBoard />
-                </div>
-              )}
-              {activeTab === "whiteboard" && (
-                <div className="h-full">
-                  <Whiteboard />
-                </div>
-              )}
-              {activeTab === "files" && (
-                <div className="h-full">
-                  <FileManager />
-                </div>
-              )}
-            </>
+          )}
+
+          {/* Keep editor mounted (hidden when not active) to prevent content loss */}
+          <div className={mode === "edit" && activeTab === "notes" ? "h-full" : "hidden"}>
+            <RichTextEditor
+              content={notesHtml}
+              onChange={setNotesHtml}
+              placeholder="Write your study notes here..."
+            />
+          </div>
+
+          {mode === "edit" && activeTab === "sketchboard" && (
+            <div className="h-full">
+              <SketchBoard />
+            </div>
+          )}
+          {mode === "edit" && activeTab === "whiteboard" && (
+            <div className="h-full">
+              <Whiteboard />
+            </div>
+          )}
+          {mode === "edit" && activeTab === "files" && (
+            <div className="h-full">
+              <FileManager />
+            </div>
           )}
         </div>
       </div>

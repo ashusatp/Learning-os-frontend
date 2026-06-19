@@ -39,7 +39,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
-import Youtube from "@tiptap/extension-youtube";
+import { ResizableYoutube } from "@/components/resizable-youtube-ext";
 import Details from "@tiptap/extension-details";
 import DetailsSummary from "@tiptap/extension-details-summary";
 import DetailsContent from "@tiptap/extension-details-content";
@@ -612,12 +612,10 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         TaskList,
         TaskItem.configure({ nested: true }),
         CodeBlockLowlight.configure({ lowlight }),
-        Youtube.configure({
+        ResizableYoutube.configure({
           HTMLAttributes: {
             class: "rounded-lg overflow-hidden my-3",
           },
-          width: 640,
-          height: 360,
         }),
         Details.configure({
           HTMLAttributes: { class: "details-node" },
@@ -669,6 +667,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         }),
       ],
       content,
+      immediatelyRender: true,
       onUpdate: ({ editor: e }) => {
         onChange?.(e.getHTML());
       },

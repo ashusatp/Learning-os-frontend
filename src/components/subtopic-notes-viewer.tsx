@@ -53,6 +53,34 @@ function EmptySection({ message }: { message: string }) {
   );
 }
 
+/**
+ * Process editor HTML to add inline styles for images based on data-width / data-align
+ * attributes. The editor stores these as data attributes but the viewer needs actual
+ * CSS to render them at the correct size and position.
+ */
+function styleEditorHtml(html: string): string {
+  // Style images based on data-width
+  let result = html.replace(/<img\b([^>]*?)>/gi, (match, attrs: string) => {
+    const widthMatch = attrs.match(/data-width="(\d+)"/);
+    const width = widthMatch ? widthMatch[1] : "100";
+    const style = `display:inline-block;width:${width}%;vertical-align:top;margin:4px;border-radius:0.5rem;`;
+    if (attrs.includes('style="')) return match;
+    return `<img${attrs} style="${style}">`;
+  });
+
+  // Style YouTube embeds based on data-pct (attribute lives on the iframe)
+  result = result.replace(/<div[^>]*data-youtube-video[^>]*>([\s\S]*?)<\/div>/gi, (match, inner: string) => {
+    const pctMatch = inner.match(/data-pct="(\d+)"/);
+    const pct = pctMatch ? pctMatch[1] : "60";
+    // Extract iframe tag and re-wrap with responsive container
+    const iframeMatch = inner.match(/<iframe\b[^>]*>/i);
+    if (!iframeMatch) return match;
+    return `<div style="width:${pct}%;margin:0.75rem auto;"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:0.5rem;">${iframeMatch[0].replace(/>$/, ` style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;border-radius:0.5rem;"></iframe>`)}</div></div>`;
+  });
+
+  return result;
+}
+
 export function SubtopicNotesViewer({
   notesHtml,
   sketchDataUrl,
@@ -89,7 +117,7 @@ export function SubtopicNotesViewer({
           <SectionHeader icon={<FileText className="h-3.5 w-3.5" />} title="Notes" />
           <div
             className="tiptap max-w-none px-4 py-3 rounded-lg border bg-card text-sm"
-            dangerouslySetInnerHTML={{ __html: notesHtml! }}
+            dangerouslySetInnerHTML={{ __html: styleEditorHtml(notesHtml!) }}
           />
         </section>
       )}
