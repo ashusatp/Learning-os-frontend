@@ -104,8 +104,8 @@ function SubtopicDetailContent() {
     updateMastery,
     updateConfidence,
   } = useSubTopicStore();
-  const { questions, fetchQuestions } = useQuestionStore();
-  const { mistakes, fetchMistakes } = useMistakeStore();
+  const { questions, fetchQuestions, total: questionTotal } = useQuestionStore();
+  const { mistakes, fetchMistakes, total: mistakeTotal } = useMistakeStore();
 
   const [mode, setMode] = useState<Mode>("view");
   const [activeTab, setActiveTab] = useState<Tab>("notes");
@@ -154,8 +154,8 @@ function SubtopicDetailContent() {
   }, [subtopics.length, topicId, fetchSubTopics]);
 
   useEffect(() => {
-    fetchQuestions(subtopicId);
-    fetchMistakes(subtopicId);
+    fetchQuestions(subtopicId, 1);
+    fetchMistakes(subtopicId, null, 1);
   }, [subtopicId, fetchQuestions, fetchMistakes]);
 
   const subtopic = subtopics.find((st) => st.id === subtopicId);
@@ -252,8 +252,8 @@ function SubtopicDetailContent() {
   const hasSketch = !!sketchDataUrl;
   const hasWhiteboard = !!whiteboardDataUrl;
   const hasFiles = (subtopic?.files?.length ?? 0) > 0;
-  const questionCount = questions.length;
-  const mistakeCount = mistakes.filter((m) => !m.is_resolved).length;
+  const questionCount = questionTotal;
+  const mistakeCount = mistakeTotal;
   const fileCount = subtopic?.files?.length ?? 0;
 
   // Content availability flags for badge dots
@@ -262,7 +262,7 @@ function SubtopicDetailContent() {
     sketchboard: hasSketch,
     whiteboard: hasWhiteboard,
     questions: questionCount > 0,
-    mistakes: mistakes.length > 0,
+    mistakes: mistakeTotal > 0,
     files: hasFiles,
   };
 
@@ -337,11 +337,11 @@ function SubtopicDetailContent() {
                 </span>
                 <span className="flex items-center gap-1">
                   <HelpCircle className="h-3 w-3" />
-                  {questions.length} Qs
+                  {questionTotal} Qs
                 </span>
                 <span className="flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3 text-red-500" />
-                  {mistakes.filter((m) => !m.is_resolved).length}/{mistakes.length} mistakes
+                  {mistakeTotal} mistakes
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Progress value={confidencePercent} className="h-1.5 w-16" />
@@ -356,10 +356,10 @@ function SubtopicDetailContent() {
                 topicId={topicId}
                 subtopicId={subtopicId}
                 subtopic={subtopic}
-                questionCount={questions.length}
-                totalMistakes={mistakes.length}
-                resolvedMistakes={mistakes.filter((m) => m.is_resolved).length}
-                unresolvedMistakes={mistakes.filter((m) => !m.is_resolved).length}
+                questionCount={questionTotal}
+                totalMistakes={subtopic.mistake_count}
+                resolvedMistakes={0}
+                unresolvedMistakes={subtopic.mistake_count}
                 onRecordRevision={() => recordRevision(topicId, subtopicId)}
                 onUpdateMastery={(level) => updateMastery(topicId, subtopicId, level)}
                 onUpdateConfidence={(level) => updateConfidence(topicId, subtopicId, level)}

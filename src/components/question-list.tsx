@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Plus,
   Pencil,
@@ -11,6 +11,8 @@ import {
   X,
   Loader2,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,9 +31,9 @@ const TYPE_LABELS: Record<QuestionType, string> = {
 };
 
 const DIFFICULTY_STYLES: Record<DifficultyLevel, string> = {
-  EASY: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400",
-  MEDIUM: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400",
-  HARD: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400",
+  EASY: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300",
+  MEDIUM: "bg-yellow-100 text-yellow-700 dark:bg-amber-500/20 dark:text-amber-300",
+  HARD: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
 };
 
 interface QuestionListProps {
@@ -44,6 +46,9 @@ export function QuestionList({ subtopicId, readOnly }: QuestionListProps) {
     questions,
     loading,
     error,
+    page,
+    total,
+    totalPages,
     fetchQuestions,
     createQuestion,
     updateQuestion,
@@ -54,11 +59,28 @@ export function QuestionList({ subtopicId, readOnly }: QuestionListProps) {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchQuestions(subtopicId);
+    fetchQuestions(subtopicId, 1);
   }, [subtopicId, fetchQuestions]);
+
+  const goToPage = useCallback(
+    (p: number) => {
+      fetchQuestions(subtopicId, p);
+      setCollapsedIds(new Set());
+    },
+    [subtopicId, fetchQuestions]
+  );
+
+  const toggleCollapse = (id: string) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleCreate = () => {
     setEditingQuestion(null);
@@ -136,7 +158,7 @@ export function QuestionList({ subtopicId, readOnly }: QuestionListProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-muted-foreground">
-          {questions.length} question{questions.length !== 1 ? "s" : ""}
+          {total} question{total !== 1 ? "s" : ""}
         </h2>
         {!readOnly && (
           <Button size="sm" onClick={handleCreate} className="gap-1.5 text-xs">
@@ -153,7 +175,7 @@ export function QuestionList({ subtopicId, readOnly }: QuestionListProps) {
             <AlertCircle className="h-7 w-7 text-muted-foreground" />
           </div>
           <p className="text-sm text-muted-foreground">
-            No questions yet.{!readOnly && " Click \"Add Question\" to create one."}
+            No questions yet.{!readOnly && ' Click "Add Question" to create one.'}
           </p>
         </div>
       ) : (
@@ -162,15 +184,57 @@ export function QuestionList({ subtopicId, readOnly }: QuestionListProps) {
             <QuestionCard
               key={q.id}
               question={q}
-              index={idx}
-              expanded={expandedId === q.id}
-              onToggle={() => setExpandedId(expandedId === q.id ? null : q.id)}
+              index={(page - 1) * 10 + idx}
+              expanded={!collapsedIds.has(q.id)}
+              onToggle={() => toggleCollapse(q.id)}
               onEdit={() => handleEdit(q)}
               onDelete={() => handleDelete(q.id)}
               deleting={deletingId === q.id}
               readOnly={readOnly}
             />
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2 border-t">
+          <span className="text-xs text-muted-foreground">
+            Page {page} of {totalPages} ({total} total)
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => goToPage(page - 1)}
+              disabled={page <= 1}
+              className="gap-1"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Prev
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <Button
+                key={p}
+                variant={p === page ? "default" : "outline"}
+                size="xs"
+                onClick={() => goToPage(p)}
+                className="w-7 h-7 p-0 text-xs"
+              >
+                {p}
+              </Button>
+            ))}
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => goToPage(page + 1)}
+              disabled={page >= totalPages}
+              className="gap-1"
+            >
+              Next
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -217,25 +281,17 @@ function QuestionCard({
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      {/* Collapsed header */}
+      {/* Header — just "Question N" + badges */}
       <button
         onClick={onToggle}
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-accent/50 transition-colors"
       >
-        <span className="text-xs font-medium text-muted-foreground w-6 shrink-0">
-          Q{index + 1}
+        <span className="text-sm font-semibold">
+          Question {index + 1}
         </span>
 
-        {/* Question text preview (strip HTML) */}
-        <span
-          className="flex-1 text-sm truncate"
-          dangerouslySetInnerHTML={{
-            __html: q.text_html.replace(/<[^>]+>/g, "").slice(0, 120) || "Untitled question",
-          }}
-        />
-
         {/* Badges */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
           <Badge variant="outline" className="text-[10px] px-1.5 py-0">
             {TYPE_LABELS[q.question_type]}
           </Badge>
@@ -246,7 +302,7 @@ function QuestionCard({
             {q.difficulty}
           </Badge>
           {q.is_pyq && (
-            <Badge className="text-[10px] px-1.5 py-0 bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400 border-purple-300 dark:border-purple-800" variant="outline">
+            <Badge className="text-[10px] px-1.5 py-0 bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 border-purple-300 dark:border-purple-500/30" variant="outline">
               PYQ
             </Badge>
           )}

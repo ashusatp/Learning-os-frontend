@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import api from "@/lib/api";
-import { Mistake } from "@/types";
+import { Mistake, PaginatedResponse } from "@/types";
 
 interface CreateMistakeData {
   question_id?: string | null;
@@ -21,7 +21,11 @@ interface MistakeState {
   mistakes: Mistake[];
   loading: boolean;
   error: string | null;
-  fetchMistakes: (subtopicId: string, resolved?: boolean | null) => Promise<void>;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  fetchMistakes: (subtopicId: string, resolved?: boolean | null, page?: number, pageSize?: number) => Promise<void>;
   fetchMistakesByGoal: (goalId: string, resolved?: boolean | null) => Promise<void>;
   createMistake: (subtopicId: string, data: CreateMistakeData) => Promise<Mistake>;
   updateMistake: (subtopicId: string, mistakeId: string, data: UpdateMistakeData) => Promise<Mistake>;
@@ -30,16 +34,35 @@ interface MistakeState {
   deleteMistake: (subtopicId: string, mistakeId: string) => Promise<void>;
 }
 
-export const useMistakeStore = create<MistakeState>((set) => ({
+export const useMistakeStore = create<MistakeState>((set, get) => ({
   mistakes: [],
   loading: false,
   error: null,
-  fetchMistakes: async (subtopicId, resolved) => {
-    set({ loading: true, error: null, mistakes: [] });
+  page: 1,
+  pageSize: 10,
+  total: 0,
+  totalPages: 0,
+  fetchMistakes: async (subtopicId, resolved, page, pageSize) => {
+    const p = page ?? get().page;
+    const ps = pageSize ?? get().pageSize;
+    set({ loading: true, error: null });
     try {
-      const params = resolved !== null && resolved !== undefined ? { resolved } : {};
-      const res = await api.get(`/subtopics/${subtopicId}/mistakes`, { params });
-      set({ mistakes: res.data, loading: false });
+      const params: Record<string, unknown> = { page: p, page_size: ps };
+      if (resolved !== null && resolved !== undefined) {
+        params.resolved = resolved;
+      }
+      const res = await api.get<PaginatedResponse<Mistake>>(
+        `/subtopics/${subtopicId}/mistakes`,
+        { params }
+      );
+      set({
+        mistakes: res.data.items,
+        total: res.data.total,
+        page: res.data.page,
+        pageSize: res.data.page_size,
+        totalPages: res.data.total_pages,
+        loading: false,
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to fetch mistakes";
       set({ error: message, loading: false });
@@ -58,7 +81,8 @@ export const useMistakeStore = create<MistakeState>((set) => ({
   },
   createMistake: async (subtopicId, data) => {
     const res = await api.post(`/subtopics/${subtopicId}/mistakes`, data);
-    set((state) => ({ mistakes: [res.data, ...state.mistakes] }));
+    // Refetch page 1 since new mistake goes to top
+    get().fetchMistakes(subtopicId, null, 1);
     return res.data;
   },
   updateMistake: async (subtopicId, mistakeId, data) => {
@@ -84,8 +108,7 @@ export const useMistakeStore = create<MistakeState>((set) => ({
   },
   deleteMistake: async (subtopicId, mistakeId) => {
     await api.delete(`/subtopics/${subtopicId}/mistakes/${mistakeId}`);
-    set((state) => ({
-      mistakes: state.mistakes.filter((m) => m.id !== mistakeId),
-    }));
+    const { page, pageSize } = get();
+    get().fetchMistakes(subtopicId, null, page, pageSize);
   },
 }));

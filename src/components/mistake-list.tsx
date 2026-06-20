@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Plus,
   Pencil,
   Trash2,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Circle,
   Loader2,
@@ -29,12 +31,12 @@ const TYPE_LABELS: Record<MistakeType, string> = {
 };
 
 const TYPE_STYLES: Record<MistakeType, string> = {
-  CONCEPTUAL: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400",
-  SILLY: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400",
-  CALCULATION: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400",
-  MISREAD: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400",
-  TIME_PRESSURE: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400",
-  OTHER: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400",
+  CONCEPTUAL: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+  SILLY: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300",
+  CALCULATION: "bg-yellow-100 text-yellow-700 dark:bg-amber-500/20 dark:text-amber-300",
+  MISREAD: "bg-blue-100 text-blue-700 dark:bg-sky-500/20 dark:text-sky-300",
+  TIME_PRESSURE: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300",
+  OTHER: "bg-gray-100 text-gray-700 dark:bg-zinc-700 dark:text-zinc-300",
 };
 
 interface MistakeListProps {
@@ -48,6 +50,9 @@ export function MistakeList({ subtopicId, readOnly, questions }: MistakeListProp
     mistakes,
     loading,
     error,
+    page,
+    total,
+    totalPages,
     fetchMistakes,
     createMistake,
     updateMistake,
@@ -65,8 +70,17 @@ export function MistakeList({ subtopicId, readOnly, questions }: MistakeListProp
 
   useEffect(() => {
     const resolved = filter === "all" ? null : filter === "resolved";
-    fetchMistakes(subtopicId, resolved);
+    fetchMistakes(subtopicId, resolved, 1);
   }, [subtopicId, filter, fetchMistakes]);
+
+  const goToPage = useCallback(
+    (p: number) => {
+      const resolved = filter === "all" ? null : filter === "resolved";
+      fetchMistakes(subtopicId, resolved, p);
+      setExpandedId(null);
+    },
+    [subtopicId, filter, fetchMistakes]
+  );
 
   const handleCreate = () => {
     setEditingMistake(null);
@@ -148,18 +162,13 @@ export function MistakeList({ subtopicId, readOnly, questions }: MistakeListProp
     );
   }
 
-  const unresolvedCount = mistakes.filter((m) => !m.is_resolved).length;
-
   return (
     <div className="w-full space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-medium text-muted-foreground">
-            {mistakes.length} mistake{mistakes.length !== 1 ? "s" : ""}
-            {unresolvedCount > 0 && (
-              <span className="text-red-500 ml-1">({unresolvedCount} unresolved)</span>
-            )}
+            {total} mistake{total !== 1 ? "s" : ""}
           </h2>
           {/* Filter pills */}
           <div className="flex items-center gap-1">
@@ -193,7 +202,7 @@ export function MistakeList({ subtopicId, readOnly, questions }: MistakeListProp
             <AlertTriangle className="h-7 w-7 text-muted-foreground" />
           </div>
           <p className="text-sm text-muted-foreground">
-            No mistakes logged.{!readOnly && " Click \"Log Mistake\" to add one."}
+            No mistakes logged.{!readOnly && ' Click "Log Mistake" to add one.'}
           </p>
         </div>
       ) : (
@@ -212,6 +221,48 @@ export function MistakeList({ subtopicId, readOnly, questions }: MistakeListProp
               readOnly={readOnly}
             />
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2 border-t">
+          <span className="text-xs text-muted-foreground">
+            Page {page} of {totalPages} ({total} total)
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => goToPage(page - 1)}
+              disabled={page <= 1}
+              className="gap-1"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Prev
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <Button
+                key={p}
+                variant={p === page ? "default" : "outline"}
+                size="xs"
+                onClick={() => goToPage(p)}
+                className="w-7 h-7 p-0 text-xs"
+              >
+                {p}
+              </Button>
+            ))}
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => goToPage(page + 1)}
+              disabled={page >= totalPages}
+              className="gap-1"
+            >
+              Next
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -240,7 +291,7 @@ function MistakeCard({
   readOnly?: boolean;
 }) {
   return (
-    <div className={`rounded-lg border bg-card overflow-hidden ${m.is_resolved ? "opacity-60" : ""}`}>
+    <div className="rounded-lg border bg-card overflow-hidden">
       {/* Header */}
       <button
         onClick={onToggle}

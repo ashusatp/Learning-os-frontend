@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import api from "@/lib/api";
-import { Question } from "@/types";
+import { Question, PaginatedResponse } from "@/types";
 
 interface CreateOptionData {
   text_html: string;
@@ -51,7 +51,11 @@ interface QuestionState {
   questions: Question[];
   loading: boolean;
   error: string | null;
-  fetchQuestions: (subtopicId: string) => Promise<void>;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  fetchQuestions: (subtopicId: string, page?: number, pageSize?: number) => Promise<void>;
   createQuestion: (
     subtopicId: string,
     data: CreateQuestionData
@@ -66,15 +70,31 @@ interface QuestionState {
   setQuestions: (questions: Question[]) => void;
 }
 
-export const useQuestionStore = create<QuestionState>((set) => ({
+export const useQuestionStore = create<QuestionState>((set, get) => ({
   questions: [],
   loading: false,
   error: null,
-  fetchQuestions: async (subtopicId) => {
-    set({ loading: true, error: null, questions: [] });
+  page: 1,
+  pageSize: 10,
+  total: 0,
+  totalPages: 0,
+  fetchQuestions: async (subtopicId, page, pageSize) => {
+    const p = page ?? get().page;
+    const ps = pageSize ?? get().pageSize;
+    set({ loading: true, error: null });
     try {
-      const res = await api.get(`/subtopics/${subtopicId}/questions`);
-      set({ questions: res.data, loading: false });
+      const res = await api.get<PaginatedResponse<Question>>(
+        `/subtopics/${subtopicId}/questions`,
+        { params: { page: p, page_size: ps } }
+      );
+      set({
+        questions: res.data.items,
+        total: res.data.total,
+        page: res.data.page,
+        pageSize: res.data.page_size,
+        totalPages: res.data.total_pages,
+        loading: false,
+      });
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to fetch questions";
@@ -83,7 +103,9 @@ export const useQuestionStore = create<QuestionState>((set) => ({
   },
   createQuestion: async (subtopicId, data) => {
     const res = await api.post(`/subtopics/${subtopicId}/questions`, data);
-    set((state) => ({ questions: [...state.questions, res.data] }));
+    // Refetch current page to keep pagination in sync
+    const { page, pageSize } = get();
+    get().fetchQuestions(subtopicId, page, pageSize);
     return res.data;
   },
   updateQuestion: async (subtopicId, questionId, data) => {
@@ -100,9 +122,9 @@ export const useQuestionStore = create<QuestionState>((set) => ({
   },
   deleteQuestion: async (subtopicId, questionId) => {
     await api.delete(`/subtopics/${subtopicId}/questions/${questionId}`);
-    set((state) => ({
-      questions: state.questions.filter((q) => q.id !== questionId),
-    }));
+    // Refetch current page
+    const { page, pageSize } = get();
+    get().fetchQuestions(subtopicId, page, pageSize);
   },
   reorderQuestions: async (subtopicId, orderedIds) => {
     await api.put(`/subtopics/${subtopicId}/questions/reorder`, {
