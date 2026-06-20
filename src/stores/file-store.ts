@@ -118,7 +118,6 @@ export const useFileStore = create<FileStoreState>((set, get) => ({
   navigateToFolder: async (topicId, subtopicId, folderId, folderName) => {
     const { breadcrumbs } = get();
     if (folderId) {
-      // Don't add if already the last breadcrumb
       const last = breadcrumbs[breadcrumbs.length - 1];
       if (last?.id !== folderId) {
         set({ breadcrumbs: [...breadcrumbs, { id: folderId, name: folderName || "Folder" }] });
@@ -126,14 +125,22 @@ export const useFileStore = create<FileStoreState>((set, get) => ({
     } else {
       set({ breadcrumbs: [{ id: null, name: "Files" }] });
     }
+    // Clear current items and show loading
+    set({ folders: [], files: [], loading: true, error: null, currentFolderId: folderId });
     await get().fetchContents(topicId, subtopicId, folderId);
   },
 
   navigateToBreadcrumb: async (topicId, subtopicId, index) => {
     const { breadcrumbs } = get();
     const target = breadcrumbs[index];
-    const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
-    set({ breadcrumbs: newBreadcrumbs });
+    set({
+      breadcrumbs: breadcrumbs.slice(0, index + 1),
+      folders: [],
+      files: [],
+      loading: true,
+      error: null,
+      currentFolderId: target.id,
+    });
     await get().fetchContents(topicId, subtopicId, target.id);
   },
 

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { QuestionEditor } from "@/components/question-editor";
 import { useQuestionStore } from "@/stores/question-store";
 import { Question, QuestionType, DifficultyLevel } from "@/types";
@@ -123,9 +124,24 @@ export function QuestionList({ subtopicId, readOnly }: QuestionListProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-        Loading questions...
+      <div className="w-full space-y-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-8 w-28 rounded-md" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-lg border bg-card px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-4 w-20" />
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <Skeleton className="h-4 w-12 rounded-full" />
+                  <Skeleton className="h-4 w-10 rounded-full" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

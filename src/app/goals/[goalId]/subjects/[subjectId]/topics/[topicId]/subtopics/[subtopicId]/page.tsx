@@ -37,6 +37,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Header, BreadcrumbEntry } from "@/components/header";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { Whiteboard } from "@/components/whiteboard";
@@ -611,9 +612,38 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
         </SheetHeader>
 
         {loadingStats || !stats ? (
-          <div className="flex items-center justify-center py-16 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-            Loading stats...
+          <div className="px-4 pb-4 space-y-5">
+            {/* Revision skeleton */}
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-16" />
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-7 w-10" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+                <Skeleton className="h-9 w-20 rounded-md" />
+              </div>
+            </div>
+            {/* Confidence skeleton */}
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-20" />
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-2 flex-1 rounded-full" />
+                <Skeleton className="h-8 w-16 rounded-md" />
+              </div>
+            </div>
+            {/* Performance skeleton */}
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <div className="grid grid-cols-2 gap-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-lg border p-3 space-y-1.5">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-6 w-10" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-5">

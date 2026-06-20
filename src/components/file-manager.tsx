@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { useFileStore, UploadProgress } from "@/stores/file-store";
 import { FileViewer } from "@/components/file-viewer";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SubtopicFile, SubtopicFolder } from "@/types";
 import api from "@/lib/api";
 
@@ -263,24 +264,7 @@ export function FileManager({ topicId, subtopicId, readOnly }: FileManagerProps)
     return `/topics/${topicId}/subtopics/${subtopicId}/files/${file.id}/download`;
   };
 
-  if (loading && folders.length === 0 && files.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-        Loading files...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center py-16 text-destructive gap-2">
-        <AlertTriangle className="h-5 w-5" />
-        {error}
-      </div>
-    );
-  }
-
+  const isLoadingEmpty = loading && folders.length === 0 && files.length === 0;
   const activeUploads = uploads.filter((u) => u.status === "uploading");
   const finishedUploads = uploads.filter((u) => u.status !== "uploading");
 
@@ -384,7 +368,23 @@ export function FileManager({ topicId, subtopicId, readOnly }: FileManagerProps)
       )}
 
       {/* Contents */}
-      {folders.length === 0 && files.length === 0 ? (
+      {error ? (
+        <div className="flex items-center justify-center py-16 text-destructive gap-2">
+          <AlertTriangle className="h-5 w-5" />
+          {error}
+        </div>
+      ) : isLoadingEmpty ? (
+        <div className="flex-1 space-y-1">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5">
+              <Skeleton className="h-5 w-5 rounded shrink-0" />
+              <Skeleton className="h-4" style={{ width: `${30 + i * 8}%` }} />
+              <div className="flex-1" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
+      ) : folders.length === 0 && files.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center py-12 gap-2">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <Folder className="h-6 w-6 text-muted-foreground" />

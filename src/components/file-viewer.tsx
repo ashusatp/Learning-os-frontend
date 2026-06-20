@@ -10,6 +10,7 @@ import {
   RotateCw,
   FileText,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -104,33 +105,35 @@ export function FileViewer({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className="!max-w-[95vw] w-[95vw] h-[90vh] p-0 flex flex-col overflow-hidden gap-0 rounded-lg">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b bg-card shrink-0">
-          <h3 className="text-sm font-medium truncate max-w-[60%]">
-            {fileName}
-          </h3>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="xs" onClick={handleDownload} className="gap-1 text-xs">
-              <Download className="h-3.5 w-3.5" />
-              Download
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)}>
-              <X className="h-4 w-4" />
-            </Button>
+        {/* Header - hidden for PDF since it has its own toolbar */}
+        {mediaType !== "pdf" && (
+          <div className="flex items-center justify-between px-4 py-2.5 border-b bg-card shrink-0">
+            <h3 className="text-sm font-medium truncate max-w-[60%]">
+              {fileName}
+            </h3>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="xs" onClick={handleDownload} className="gap-1 text-xs">
+                <Download className="h-3.5 w-3.5" />
+                Download
+              </Button>
+              <Button variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Content */}
-        <div className="flex-1 overflow-auto flex items-center justify-center bg-black/5 dark:bg-black/20">
+        <div className={`flex-1 overflow-hidden ${mediaType === "pdf" ? "" : "overflow-auto flex items-center justify-center bg-black/5 dark:bg-black/20"}`}>
           {loading && (
-            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <span className="text-sm">Loading...</span>
+            <div className="flex flex-col items-center justify-center h-full gap-4">
+              <Skeleton className="w-[60%] h-[70%] rounded-lg" />
+              <Skeleton className="h-3 w-32" />
             </div>
           )}
 
           {error && (
-            <div className="flex flex-col items-center gap-2 text-destructive">
+            <div className="flex flex-col items-center justify-center h-full gap-2 text-destructive">
               <FileText className="h-8 w-8" />
               <span className="text-sm">{error}</span>
             </div>
@@ -141,7 +144,14 @@ export function FileViewer({
               {mediaType === "image" && <ImageViewer src={blobUrl} alt={fileName} />}
               {mediaType === "video" && <VideoPlayer src={blobUrl} type={contentType} />}
               {mediaType === "audio" && <AudioPlayer src={blobUrl} type={contentType} fileName={fileName} />}
-              {mediaType === "pdf" && <PdfViewer src={blobUrl} />}
+              {mediaType === "pdf" && (
+                <PdfViewer
+                  src={blobUrl}
+                  fileName={fileName}
+                  onDownload={handleDownload}
+                  onClose={() => onOpenChange(false)}
+                />
+              )}
               {mediaType === "unknown" && (
                 <div className="flex flex-col items-center gap-3 text-muted-foreground">
                   <FileText className="h-12 w-12" />
