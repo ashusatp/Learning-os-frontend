@@ -47,6 +47,12 @@ import DetailsContent from "@tiptap/extension-details-content";
 import { common, createLowlight } from "lowlight";
 
 // ── Icons ──
+import { Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { DOMSerializer } from "@tiptap/pm/model";
+import { AIHelpInline } from "@/components/ai-help-inline";
+import { AISlashDropdown, type SlashCommand } from "@/components/ai-slash-dropdown";
+
 import {
   Bold,
   Italic,
@@ -87,6 +93,7 @@ import {
   Type,
   AArrowUp,
   AArrowDown,
+  Sparkles,
 } from "lucide-react";
 
 const lowlight = createLowlight(common);
@@ -95,10 +102,19 @@ const lowlight = createLowlight(common);
 // Types
 // ═══════════════════════════════════════════
 
+interface AIHierarchy {
+  goal?: string | null;
+  subject?: string | null;
+  topic?: string | null;
+  subtopic?: string | null;
+}
+
 interface RichTextEditorProps {
   content?: string;
   onChange?: (html: string) => void;
   placeholder?: string;
+  aiEnabled?: boolean;
+  aiHierarchy?: AIHierarchy;
 }
 
 export interface RichTextEditorRef {
@@ -631,16 +647,201 @@ function FontFamilyMenu({
 
 export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
   function RichTextEditor(
-    { content = "", onChange, placeholder = "Start writing your notes..." },
+    { content = "", onChange, placeholder = "Start writing your notes...", aiEnabled = false, aiHierarchy },
     ref,
   ) {
     // Popover states
     const [pop, setPop] = useState<string | null>(null);
+    // AI state
+    const [showAIHelp, setShowAIHelp] = useState(false);
+    const [aiInsertPos, setAiInsertPos] = useState<number | null>(null);
+    const [aiInitialPrompt, setAiInitialPrompt] = useState<string | undefined>();
+    const [aiSelectedText, setAiSelectedText] = useState<string | undefined>();
+    const [aiChatCoords, setAiChatCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+    const editorWrapperRef = useRef<HTMLDivElement>(null);
+    const [slashDropdown, setSlashDropdown] = useState<{
+      query: string;
+      coords: { top: number; left: number };
+      triggerStart: number;
+    } | null>(null);
+
     const closePop = useCallback(() => setPop(null), []);
     const togglePop = useCallback(
       (name: string) => setPop((p) => (p === name ? null : name)),
       [],
     );
+
+    // Refs for ProseMirror plugin (stable across renders)
+    const aiEnabledRef = useRef(aiEnabled);
+    aiEnabledRef.current = aiEnabled;
+
+    const slashCallbackRef = useRef<{
+      onSlashUpdate: (query: string, coords: { top: number; left: number }, triggerStart: number) => void;
+      onSlashClose: () => void;
+    }>({
+      onSlashUpdate: () => {},
+      onSlashClose: () => {},
+    });
+
+    slashCallbackRef.current.onSlashUpdate = useCallback(
+      (query: string, coords: { top: number; left: number }, triggerStart: number) => {
+        setSlashDropdown((prev) => {
+          if (
+            prev &&
+            prev.query === query &&
+            prev.triggerStart === triggerStart &&
+            Math.abs(prev.coords.top - coords.top) < 1 &&
+            Math.abs(prev.coords.left - coords.left) < 1
+          ) {
+            return prev; // no change, prevent re-render
+          }
+          return { query, coords, triggerStart };
+        });
+      },
+      [],
+    );
+
+    slashCallbackRef.current.onSlashClose = useCallback(() => {
+      setSlashDropdown((prev) => (prev === null ? prev : null));
+    }, []);
+
+    // Get AI chat position relative to editor scroll container
+    const getAIChatCoords = useCallback((docPos: number) => {
+      const ed = editorRef.current;
+      const wrapper = editorWrapperRef.current;
+      if (!ed || !wrapper) return null;
+      const coords = ed.view.coordsAtPos(docPos);
+      const wrapperRect = wrapper.getBoundingClientRect();
+      return {
+        top: coords.bottom - wrapperRect.top + wrapper.scrollTop + 4,
+        left: 0,
+        width: wrapperRect.width,
+      };
+    }, []);
+
+    // Open AI chat helper
+    const openAIChat = useCallback((pos: number, prompt?: string, selected?: string) => {
+      setAiInsertPos(pos);
+      setAiInitialPrompt(prompt);
+      setAiSelectedText(selected);
+      setAiChatCoords(getAIChatCoords(pos));
+      setShowAIHelp(true);
+    }, [getAIChatCoords]);
+
+    // Handle slash command selection
+    const handleSlashCommandSelect = useCallback(
+      (cmd: SlashCommand) => {
+        if (!slashDropdown) return;
+        const editorInstance = editorRef.current;
+        if (editorInstance) {
+          const { state } = editorInstance.view;
+          const $from = state.selection.$from;
+          const tr = state.tr.delete(slashDropdown.triggerStart, $from.pos);
+          editorInstance.view.dispatch(tr);
+        }
+        setSlashDropdown(null);
+
+        const pos = slashDropdown.triggerStart;
+        const promptMap: Record<string, string | undefined> = {
+          "ai-help": undefined,
+          "ai-ask": undefined,
+          "ai-explain": "Explain this topic in detail with clear definitions and key points.",
+          "ai-example": "Provide detailed examples with explanations for this topic.",
+          "ai-summarize": "Summarize the current notes concisely with key points, formulas, and important definitions.",
+        };
+        openAIChat(pos, promptMap[cmd.id]);
+      },
+      [slashDropdown, openAIChat],
+    );
+
+    // "Ask AI" from bubble menu (selected text)
+    const handleAskAISelection = useCallback(() => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      const { state } = ed.view;
+      const { from, to } = state.selection;
+      const text = state.doc.textBetween(from, to, " ");
+      if (!text.trim()) return;
+      // Capture selected content as HTML for rich display
+      const slice = state.doc.slice(from, to);
+      const tempDiv = document.createElement("div");
+      const serializer = DOMSerializer.fromSchema(state.schema);
+      const fragment = serializer.serializeFragment(slice.content);
+      tempDiv.appendChild(fragment);
+      const selectedHtml = tempDiv.innerHTML;
+      openAIChat(to, undefined, selectedHtml || text);
+    }, [openAIChat]);
+
+    // Editor ref for accessing from callbacks
+    const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+
+    // AI slash-detection ProseMirror plugin
+    const aiSlashExtension = useRef(
+      Extension.create({
+        name: "aiSlashDetector",
+        addProseMirrorPlugins() {
+          const enabledRef = aiEnabledRef;
+          const cbRef = slashCallbackRef;
+          return [
+            new Plugin({
+              key: new PluginKey("aiSlashDetector"),
+              props: {
+                handleKeyDown(view, event) {
+                  if (!enabledRef.current) return false;
+
+                  // Close dropdown on Escape
+                  if (event.key === "Escape") {
+                    cbRef.current.onSlashClose();
+                    return false;
+                  }
+
+                  // Let the dropdown handle Enter/Arrow keys
+                  return false;
+                },
+              },
+              view() {
+                return {
+                  update(view) {
+                    if (!enabledRef.current) return;
+
+                    const { state } = view;
+                    const { $from } = state.selection;
+
+                    // Only in empty selections (cursor, not range)
+                    if (!state.selection.empty) {
+                      cbRef.current.onSlashClose();
+                      return;
+                    }
+
+                    const textBefore = $from.parent.textContent.slice(0, $from.parentOffset);
+                    const match = textBefore.match(/\/ai([\w-]*)$/);
+
+                    if (!match) {
+                      cbRef.current.onSlashClose();
+                      return;
+                    }
+
+                    // Get cursor coordinates for dropdown positioning
+                    const coords = view.coordsAtPos($from.pos);
+                    const editorRect = view.dom.getBoundingClientRect();
+                    const triggerStart = $from.pos - match[0].length;
+
+                    cbRef.current.onSlashUpdate(
+                      match[1] || "", // query after "/ai"
+                      {
+                        top: coords.bottom + 4,
+                        left: Math.max(coords.left, editorRect.left),
+                      },
+                      triggerStart,
+                    );
+                  },
+                };
+              },
+            }),
+          ];
+        },
+      }),
+    ).current;
 
     const editor = useEditor({
       extensions: [
@@ -691,6 +892,9 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         }),
         DetailsSummary,
         DetailsContent,
+
+        // ── AI Help trigger (always loaded, checks aiEnabled ref internally) ──
+        aiSlashExtension,
 
         // ── Functionality ──
         FileHandler.configure({
@@ -760,6 +964,9 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         editor.off("transaction", handler);
       };
     }, [editor]);
+
+    // Keep editor ref in sync for AI callbacks
+    editorRef.current = editor;
 
     useImperativeHandle(ref, () => ({
       getHTML: () => editor?.getHTML() || "",
@@ -1088,6 +1295,28 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               <YoutubeInput editor={editor} onClose={closePop} />
             )}
           </div>
+
+          {/* AI Help */}
+          {aiEnabled && (
+            <>
+              <TSep />
+              <TBtn
+                onClick={() => {
+                  if (showAIHelp) {
+                    setShowAIHelp(false);
+                    setAiChatCoords(null);
+                    editor.commands.focus();
+                  } else {
+                    openAIChat(editor.state.selection.from);
+                  }
+                }}
+                isActive={showAIHelp}
+                title="AI Help (/ai-help)"
+              >
+                <Sparkles className={I} />
+              </TBtn>
+            </>
+          )}
         </div>
 
         {/* ═══ Bubble Menu (on text selection) ═══ */}
@@ -1158,6 +1387,17 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           >
             <LinkIcon className={IB} />
           </TBtn>
+          {aiEnabled && (
+            <>
+              <div className="w-px h-4 bg-border mx-0.5" />
+              <TBtn
+                onClick={handleAskAISelection}
+                title="Ask AI about selection"
+              >
+                <Sparkles className={IB} />
+              </TBtn>
+            </>
+          )}
         </BubbleMenu>
 
         {/* ═══ Table controls bar (when cursor is in a table) ═══ */}
@@ -1234,9 +1474,47 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         )}
 
         {/* ═══ Editor Content ═══ */}
-        <div className="flex-1 overflow-y-auto" onClick={closePop}>
+        <div ref={editorWrapperRef} className="flex-1 overflow-y-auto relative" onClick={closePop}>
           <EditorContent editor={editor} className="h-full [&_.tiptap]:py-4 [&_.tiptap]:px-2" />
+
+          {/* ═══ AI Slash Command Dropdown ═══ */}
+          {slashDropdown && aiEnabled && (
+            <AISlashDropdown
+              query={slashDropdown.query}
+              coords={slashDropdown.coords}
+              onSelect={handleSlashCommandSelect}
+              onClose={() => setSlashDropdown(null)}
+            />
+          )}
         </div>
+
+        {/* ═══ AI Help Inline Chat — fixed centered overlay ═══ */}
+        {showAIHelp && aiEnabled && (
+          <AIHelpInline
+            key={`${aiInsertPos}-${aiInitialPrompt}-${aiSelectedText}`}
+            hierarchy={aiHierarchy || {}}
+            currentNotesHtml={editor.getHTML()}
+            initialPrompt={aiInitialPrompt}
+            selectedText={aiSelectedText}
+            onApprove={(html) => {
+              const pos = aiInsertPos ?? editor.state.doc.content.size;
+              editor.chain().focus().insertContentAt(pos, html).run();
+              setShowAIHelp(false);
+              setAiInsertPos(null);
+              setAiInitialPrompt(undefined);
+              setAiSelectedText(undefined);
+              setAiChatCoords(null);
+            }}
+            onClose={() => {
+              setShowAIHelp(false);
+              setAiInsertPos(null);
+              setAiInitialPrompt(undefined);
+              setAiSelectedText(undefined);
+              setAiChatCoords(null);
+              editor.commands.focus();
+            }}
+          />
+        )}
 
         {/* ═══ Footer ═══ */}
         <div className="flex items-center justify-end gap-3 px-3 py-1 border-t bg-muted/20 text-[11px] text-muted-foreground select-none shrink-0">

@@ -452,6 +452,13 @@ function SubtopicDetailContent() {
                       content={notesHtml}
                       onChange={setNotesHtml}
                       placeholder="Write your study notes here..."
+                      aiEnabled={true}
+                      aiHierarchy={{
+                        goal: activeGoal?.title,
+                        subject: activeSubject?.name,
+                        topic: activeTopic?.name,
+                        subtopic: subtopic?.name,
+                      }}
                     />
                     <FullscreenButton onClick={() => setFullscreen("notes")} />
                   </div>
@@ -509,6 +516,13 @@ function SubtopicDetailContent() {
               content={notesHtml}
               onChange={setNotesHtml}
               placeholder="Write your study notes here..."
+              aiEnabled={true}
+              aiHierarchy={{
+                goal: activeGoal?.title,
+                subject: activeSubject?.name,
+                topic: activeTopic?.name,
+                subtopic: subtopic?.name,
+              }}
             />
           ) : (
             <div className="h-full overflow-y-auto p-6">
