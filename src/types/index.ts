@@ -61,6 +61,44 @@ export interface SubtopicFile {
   created_at: string;
 }
 
+export type QuestionType =
+  | "SINGLE_MCQ"
+  | "MULTI_MCQ"
+  | "NUMERICAL"
+  | "TRUE_FALSE"
+  | "SUBJECTIVE";
+
+export type DifficultyLevel = "EASY" | "MEDIUM" | "HARD";
+
+export interface QuestionOption {
+  id: string;
+  question_id: string;
+  text_html: string;
+  is_correct: boolean;
+  order: number;
+  created_at: string;
+}
+
+export interface Question {
+  id: string;
+  subtopic_id: string;
+  question_type: QuestionType;
+  text_html: string;
+  explanation_html: string | null;
+  difficulty: DifficultyLevel;
+  marks: number;
+  negative_marks: number;
+  numerical_answer: number | null;
+  numerical_tolerance: number | null;
+  answer_html: string | null;
+  is_pyq: boolean;
+  tags: string[];
+  order: number;
+  options: QuestionOption[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SubTopic {
   id: string;
   topic_id: string;

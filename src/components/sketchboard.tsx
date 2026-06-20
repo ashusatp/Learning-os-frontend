@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
+import { useTheme } from "next-themes";
 import {
   Pen,
   Pencil,
@@ -43,7 +44,7 @@ import {
 
 type DrawTool = "pen" | "pencil" | "highlighter" | "eraser";
 type ShapeType = "rectangle" | "circle" | "line" | "arrow";
-type ActiveTool = DrawTool | "hand" | "shape" | "text" | "image";
+type ActiveTool = DrawTool | "hand" | "shape" | "text" | "image" | "laser";
 type CanvasTheme = "light" | "dark";
 type Background = "blank" | "grid" | "dots" | "lines";
 type CanvasMode = "infinite" | "pages";
@@ -113,6 +114,7 @@ interface Page {
 interface SketchBoardProps {
   initialData?: string;
   onChange?: (data: string) => void;
+  readOnly?: boolean;
 }
 
 // ═══════════════════════════════════════════
@@ -186,6 +188,50 @@ const BG_OPTIONS: { id: Background; label: string }[] = [
 // Drawing helpers
 // ═══════════════════════════════════════════
 
+/** Parse a hex color to [r, g, b] */
+function hexToRgb(hex: string): [number, number, number] | null {
+  const m = hex.match(/^#?([0-9a-f]{3,8})$/i);
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  if (h.length < 6) return null;
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
+/** Relative luminance (0=black, 1=white) */
+function luminance(r: number, g: number, b: number): number {
+  const [rs, gs, bs] = [r/255, g/255, b/255].map(c =>
+    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  );
+  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+}
+
+// Map light palette defaults → dark palette equivalents and vice versa
+const LIGHT_TO_DARK: Record<string, string> = {};
+const DARK_TO_LIGHT: Record<string, string> = {};
+LIGHT_COLORS.forEach((c, i) => {
+  if (i < DARK_COLORS.length) {
+    LIGHT_TO_DARK[c.value.toLowerCase()] = DARK_COLORS[i].value;
+    DARK_TO_LIGHT[DARK_COLORS[i].value.toLowerCase()] = c.value;
+  }
+});
+
+/** Adapt element color so dark strokes become light on dark canvas and vice versa */
+function adaptColor(color: string, theme: CanvasTheme): string {
+  const key = color.toLowerCase().trim();
+  // First check if it's a known palette color and map it
+  if (theme === "dark" && LIGHT_TO_DARK[key]) return LIGHT_TO_DARK[key];
+  if (theme === "light" && DARK_TO_LIGHT[key]) return DARK_TO_LIGHT[key];
+  // Fallback: luminance-based swap for arbitrary colors
+  const rgb = hexToRgb(key);
+  if (rgb) {
+    const lum = luminance(...rgb);
+    if (theme === "dark" && lum < 0.15) return "#e2e8f0"; // too dark for dark bg → light
+    if (theme === "light" && lum > 0.85) return "#1a1a2e"; // too light for light bg → dark
+  }
+  return color;
+}
+
 function getStrokeStyle(tool: DrawTool, color: string, size: number) {
   switch (tool) {
     case "pen":
@@ -199,9 +245,10 @@ function getStrokeStyle(tool: DrawTool, color: string, size: number) {
   }
 }
 
-function drawStrokeElement(ctx: CanvasRenderingContext2D, el: StrokeElement) {
+function drawStrokeElement(ctx: CanvasRenderingContext2D, el: StrokeElement, theme: CanvasTheme) {
   if (el.points.length < 2) return;
-  const style = getStrokeStyle(el.tool, el.color, el.size);
+  const adapted = adaptColor(el.color, theme);
+  const style = getStrokeStyle(el.tool, adapted, el.size);
   ctx.save();
   ctx.globalAlpha = style.opacity;
   ctx.strokeStyle = style.color;
@@ -238,9 +285,9 @@ function drawStrokeElement(ctx: CanvasRenderingContext2D, el: StrokeElement) {
   ctx.restore();
 }
 
-function drawShapeElement(ctx: CanvasRenderingContext2D, el: ShapeElement) {
+function drawShapeElement(ctx: CanvasRenderingContext2D, el: ShapeElement, theme: CanvasTheme) {
   ctx.save();
-  ctx.strokeStyle = el.color;
+  ctx.strokeStyle = adaptColor(el.color, theme);
   ctx.lineWidth = el.size;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -291,10 +338,10 @@ function drawShapeElement(ctx: CanvasRenderingContext2D, el: ShapeElement) {
   ctx.restore();
 }
 
-function drawTextElement(ctx: CanvasRenderingContext2D, el: TextElement) {
+function drawTextElement(ctx: CanvasRenderingContext2D, el: TextElement, theme: CanvasTheme) {
   ctx.save();
   ctx.font = `${el.fontSize}px Inter, system-ui, sans-serif`;
-  ctx.fillStyle = el.color;
+  ctx.fillStyle = adaptColor(el.color, theme);
   ctx.textBaseline = "top";
   const lines = el.text.split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -317,17 +364,18 @@ function drawImageElement(
 function drawElement(
   ctx: CanvasRenderingContext2D,
   el: CanvasElement,
-  imageCache: Map<string, HTMLImageElement>
+  imageCache: Map<string, HTMLImageElement>,
+  theme: CanvasTheme
 ) {
   switch (el.type) {
     case "stroke":
-      drawStrokeElement(ctx, el);
+      drawStrokeElement(ctx, el, theme);
       break;
     case "shape":
-      drawShapeElement(ctx, el);
+      drawShapeElement(ctx, el, theme);
       break;
     case "text":
-      drawTextElement(ctx, el);
+      drawTextElement(ctx, el, theme);
       break;
     case "image":
       drawImageElement(ctx, el, imageCache);
@@ -582,10 +630,10 @@ function renderCanvas(
   }
 
   for (const el of elements) {
-    drawElement(offCtx as CanvasRenderingContext2D, el, imageCache);
+    drawElement(offCtx as CanvasRenderingContext2D, el, imageCache, theme);
   }
   if (currentElement) {
-    drawElement(offCtx as CanvasRenderingContext2D, currentElement, imageCache);
+    drawElement(offCtx as CanvasRenderingContext2D, currentElement, imageCache, theme);
   }
 
   offCtx.restore();
@@ -601,21 +649,37 @@ function renderCanvas(
 // Component
 // ═══════════════════════════════════════════
 
-export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
+export function SketchBoard({ initialData, onChange, readOnly = false }: SketchBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Sync with site theme
+  const { resolvedTheme } = useTheme();
+  const siteIsDark = resolvedTheme === "dark";
+
   // ── State ──
-  const [activeTool, setActiveTool] = useState<ActiveTool>("pen");
+  const [activeTool, setActiveTool] = useState<ActiveTool>(readOnly ? "hand" : "pen");
   const [shapeType, setShapeType] = useState<ShapeType>("rectangle");
   const [canvasTheme, setCanvasTheme] = useState<CanvasTheme>("light");
   const [background, setBackground] = useState<Background>("grid");
   const [color, setColor] = useState("#1a1a2e");
   const [size, setSize] = useState(3);
   const [canvasMode, setCanvasMode] = useState<CanvasMode>("infinite");
+
+  // Sync canvas theme with site theme
+  const themeSynced = useRef(false);
+  useEffect(() => {
+    if (themeSynced.current) return; // only sync once on mount
+    const target: CanvasTheme = siteIsDark ? "dark" : "light";
+    if (target !== canvasTheme) {
+      setCanvasTheme(target);
+      setColor(target === "dark" ? "#e2e8f0" : "#1a1a2e");
+    }
+    themeSynced.current = true;
+  }, [siteIsDark]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pages
   const [pages, setPages] = useState<Page[]>(() => {
@@ -676,6 +740,14 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
 
   // Image cache
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  // Laser pointer
+  const laserPointsRef = useRef<Array<[number, number, number, number]>>([]); // [x, y, pressure, timestamp]
+  const laserCanvasRef = useRef<HTMLCanvasElement>(null);
+  const laserAnimRef = useRef<number>(0);
+  const laserStoppedAt = useRef<number | null>(null);
+  const LASER_TRAIL_MS = 1000; // how long points live while drawing
+  const LASER_FADE_MS = 600; // fade-out duration after stopping
 
   const colors = canvasTheme === "dark" ? DARK_COLORS : LIGHT_COLORS;
   const isHandTool = activeTool === "hand" || spaceHeld;
@@ -791,6 +863,123 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
     }
   }, [elements, redraw]);
 
+  // ── Laser render loop ──
+  const drawLaser = useCallback(() => {
+    const lc = laserCanvasRef.current;
+    if (!lc) return;
+    const ctx = lc.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = lc.clientWidth;
+    const h = lc.clientHeight;
+    if (lc.width !== w * dpr || lc.height !== h * dpr) {
+      lc.width = w * dpr;
+      lc.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const now = Date.now();
+    const pts = laserPointsRef.current;
+
+    // After stopping, fade out then clear
+    let globalFade = 1;
+    if (laserStoppedAt.current !== null) {
+      const elapsed = now - laserStoppedAt.current;
+      if (elapsed >= LASER_FADE_MS) {
+        laserPointsRef.current = [];
+        laserStoppedAt.current = null;
+        return;
+      }
+      globalFade = 1 - elapsed / LASER_FADE_MS;
+    }
+
+    // Remove points older than trail duration
+    const cutoff = now - LASER_TRAIL_MS;
+    while (pts.length > 0 && pts[0][3] < cutoff) pts.shift();
+
+    if (pts.length < 2) return;
+
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Draw line segments with per-segment opacity (tail→head: transparent→opaque)
+    for (let i = 1; i < pts.length; i++) {
+      const t = i / (pts.length - 1); // 0 at tail, 1 at head
+      const age = (now - pts[i][3]) / LASER_TRAIL_MS; // 0=new, 1=old
+      const alpha = globalFade * Math.max(0.05, (1 - age) * (0.3 + 0.7 * t));
+      const lineWidth = 2 + 3 * t; // thinner at tail, thicker at head
+
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = "#ef4444";
+      ctx.shadowColor = "rgba(239, 68, 68, 0.7)";
+      ctx.shadowBlur = 8 * t;
+      ctx.lineWidth = lineWidth;
+
+      ctx.beginPath();
+      ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
+      ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.stroke();
+    }
+
+    // Bright core line (thinner, lighter color) for the recent portion
+    const recentStart = Math.max(1, Math.floor(pts.length * 0.5));
+    for (let i = recentStart; i < pts.length; i++) {
+      const t = (i - recentStart) / Math.max(1, pts.length - recentStart - 1);
+      ctx.globalAlpha = globalFade * (0.4 + 0.6 * t);
+      ctx.strokeStyle = "#fca5a5";
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 1 + 1.5 * t;
+
+      ctx.beginPath();
+      ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
+      ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.stroke();
+    }
+
+    // Glowing dot at head
+    const head = pts[pts.length - 1];
+    ctx.globalAlpha = globalFade;
+    ctx.shadowColor = "rgba(239, 68, 68, 0.9)";
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = "#ef4444";
+    ctx.beginPath();
+    ctx.arc(head[0], head[1], 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Inner bright dot
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = globalFade * 0.9;
+    ctx.fillStyle = "#fecaca";
+    ctx.beginPath();
+    ctx.arc(head[0], head[1], 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }, []);
+
+  useEffect(() => {
+    if (activeTool !== "laser") {
+      // Clean up when switching away
+      cancelAnimationFrame(laserAnimRef.current);
+      const lc = laserCanvasRef.current;
+      if (lc) {
+        const ctx = lc.getContext("2d");
+        ctx?.clearRect(0, 0, lc.width, lc.height);
+      }
+      laserPointsRef.current = [];
+      laserStoppedAt.current = null;
+      return;
+    }
+    const loop = () => {
+      drawLaser();
+      laserAnimRef.current = requestAnimationFrame(loop);
+    };
+    laserAnimRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(laserAnimRef.current);
+  }, [activeTool, drawLaser]);
+
   // ── iOS: prevent default touch behaviors on canvas only ──
 
   useEffect(() => {
@@ -842,7 +1031,7 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
       e.preventDefault();
       const canvas = canvasRef.current;
       if (!canvas) return;
-      canvas.setPointerCapture(e.pointerId);
+      if (activeTool !== "laser") canvas.setPointerCapture(e.pointerId);
 
       // Close pickers & auto-collapse toolbar
       setShowSizePicker(false);
@@ -870,6 +1059,8 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
         panStart.current = { x: e.clientX, y: e.clientY, cx: 0, cy: camera.y };
         return;
       }
+
+      if (readOnly) return;
 
       const world = screenToWorld(e.clientX, e.clientY);
 
@@ -923,10 +1114,23 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
 
   const handlePointerMove = useCallback(
     (e: ReactPointerEvent<HTMLCanvasElement>) => {
+      // Laser pointer tracking
+      if (activeTool === "laser") {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          laserStoppedAt.current = null;
+          laserPointsRef.current.push([x, y, e.pressure || 0.5, Date.now()]);
+        }
+        return;
+      }
+
       // Pan
-      if (isPanning && panStart.current) {
-        const dy = e.clientY - panStart.current.y;
-        setCamera((c) => ({ ...c, y: clampY(panStart.current!.cy + dy) }));
+      const pan = panStart.current;
+      if (isPanning && pan) {
+        const dy = e.clientY - pan.y;
+        setCamera((c) => ({ ...c, y: clampY(pan.cy + dy) }));
         return;
       }
 
@@ -947,13 +1151,20 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
 
       redraw();
     },
-    [isPanning, isDrawing, screenToWorld, camera, redraw]
+    [isPanning, isDrawing, screenToWorld, camera, redraw, activeTool]
   );
 
   const handlePointerUp = useCallback(
     (e: ReactPointerEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
       if (canvas) canvas.releasePointerCapture(e.pointerId);
+
+      if (activeTool === "laser") {
+        if (laserPointsRef.current.length > 0 && laserStoppedAt.current === null) {
+          laserStoppedAt.current = Date.now();
+        }
+        return;
+      }
 
       if (isPanning) {
         setIsPanning(false);
@@ -983,7 +1194,7 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
       currentElement.current = null;
       setIsDrawing(false);
     },
-    [isPanning, isDrawing, elements, setElements, pages, activePageIndex, notifyChange]
+    [isPanning, isDrawing, elements, setElements, pages, activePageIndex, notifyChange, activeTool]
   );
 
   // ── Scroll zoom / pan ──
@@ -1326,9 +1537,11 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
 
   const cursor = isHandTool || isPanning
     ? "cursor-grab active:cursor-grabbing"
-    : activeTool === "text"
-      ? "cursor-text"
-      : "cursor-crosshair";
+    : activeTool === "laser"
+      ? "cursor-none"
+      : activeTool === "text"
+        ? "cursor-text"
+        : "cursor-crosshair";
 
   const cornerBtn = `p-2 rounded-xl transition-colors ${
     isDark
@@ -1356,6 +1569,14 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
           onWheel={handleWheel}
           onContextMenu={(e) => e.preventDefault()}
         />
+
+        {/* Laser pointer overlay canvas */}
+        {activeTool === "laser" && (
+          <canvas
+            ref={laserCanvasRef}
+            className="absolute inset-0 w-full h-full pointer-events-none z-10"
+          />
+        )}
 
         {/* Text input overlay */}
         {textEditing && (
@@ -1391,7 +1612,7 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
         )}
 
         {/* ── Floating toolbar (draggable, collapsible) ── */}
-        {showToolbar ? (() => {
+        {!readOnly && showToolbar ? (() => {
           // Determine if popovers should open upward (toolbar is in bottom half)
           const containerH = containerRef.current?.getBoundingClientRect().height ?? 600;
           const tbY = toolbarPos?.y ?? 12;
@@ -1556,7 +1777,7 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
             </div>
           </div>
           );
-        })() : (() => {
+        })() : !readOnly ? (() => {
           // Show the active tool icon, colored with chosen color for draw tools
           const isDrawTool = ["pen", "pencil", "highlighter", "eraser"].includes(activeTool);
           const iconColor = isDrawTool && activeTool !== "eraser" ? color : undefined;
@@ -1594,10 +1815,10 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
               {toolIcon}
             </button>
           );
-        })()}
+        })() : null}
 
         {/* ── Corner controls (always visible, fixed) ── */}
-        <div
+        {!readOnly && <div
           className={`absolute top-2 right-2 z-20 flex items-center gap-0.5 rounded-xl p-0.5 backdrop-blur-xl shadow-lg ${
             isDark ? "bg-[#16161e]/80 border border-white/[0.06]" : "bg-white/80 border border-black/[0.06]"
           }`}
@@ -1646,7 +1867,54 @@ export function SketchBoard({ initialData, onChange }: SketchBoardProps) {
           >
             {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
-        </div>
+        </div>}
+
+        {/* ReadOnly: laser pointer + theme controls */}
+        {readOnly && (
+          <div
+            className={`absolute top-2 right-2 z-20 flex items-center gap-0.5 rounded-xl p-0.5 backdrop-blur-xl shadow-lg ${
+              isDark ? "bg-[#16161e]/80 border border-white/[0.06]" : "bg-white/80 border border-black/[0.06]"
+            }`}
+          >
+            <button
+              onClick={() => setActiveTool(activeTool === "laser" ? "hand" : "laser")}
+              title={activeTool === "laser" ? "Pan mode" : "Laser pointer"}
+              className={`p-1.5 rounded-lg transition-colors ${
+                activeTool === "laser"
+                  ? "bg-red-500/20 text-red-500"
+                  : isDark
+                    ? "text-gray-400 hover:text-gray-200 hover:bg-white/[0.06]"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-black/[0.06]"
+              }`}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="2" fill="currentColor" />
+                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setActiveTool("hand")}
+              title="Pan"
+              className={`p-1.5 rounded-lg transition-colors ${
+                activeTool === "hand"
+                  ? isDark ? "bg-white/[0.1] text-white" : "bg-black/[0.06] text-gray-900"
+                  : isDark
+                    ? "text-gray-400 hover:text-gray-200 hover:bg-white/[0.06]"
+                    : "text-gray-500 hover:text-gray-800 hover:bg-black/[0.06]"
+              }`}
+            >
+              <Hand className="h-4 w-4" />
+            </button>
+            <div className={`w-px h-4 ${isDark ? "bg-white/[0.08]" : "bg-black/[0.08]"}`} />
+            <button
+              onClick={handleThemeToggle}
+              title={isDark ? "Light canvas" : "Dark canvas"}
+              className={cornerBtn}
+            >
+              {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        )}
 
         {/* Scroll to top (infinite mode only) */}
         {camera.y !== 0 && canvasMode === "infinite" && (

@@ -500,13 +500,13 @@ function SubjectDetailContent() {
   };
 
   const handleSaveEditSubtopic = async (data: Record<string, string | number>) => {
-    if (editingSubtopic) {
-      await updateSubTopic(editingSubtopic.id, data);
+    if (editingSubtopic && selectedTopic) {
+      await updateSubTopic(selectedTopic.id, editingSubtopic.id, data);
     }
   };
 
   const handleDeleteSubtopic = async (subtopic: SubTopic) => {
-    await deleteSubTopic(subtopic.id);
+    if (selectedTopic) await deleteSubTopic(selectedTopic.id, subtopic.id);
   };
 
   const handleDuplicateSubtopic = async (subtopic: SubTopic) => {

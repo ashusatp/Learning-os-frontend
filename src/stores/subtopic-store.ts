@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import api from "@/lib/api";
-import { SubTopic, SubtopicFile } from "@/types";
+import { SubTopic, SubtopicFile, MasteryLevel } from "@/types";
 
 interface SaveNotesData {
   notes_html?: string | null;
@@ -18,17 +18,32 @@ interface SubTopicState {
     data: Partial<SubTopic>
   ) => Promise<SubTopic>;
   updateSubTopic: (
+    topicId: string,
     subtopicId: string,
     data: Partial<SubTopic>
   ) => Promise<void>;
-  deleteSubTopic: (subtopicId: string) => Promise<void>;
+  deleteSubTopic: (topicId: string, subtopicId: string) => Promise<void>;
   duplicateSubTopic: (topicId: string, subtopic: SubTopic) => Promise<SubTopic>;
   reorderSubTopics: (topicId: string, orderedIds: string[]) => Promise<void>;
   setSubtopics: (subtopics: SubTopic[]) => void;
-  recordRevision: (subtopicId: string) => Promise<void>;
+  recordRevision: (topicId: string, subtopicId: string) => Promise<void>;
   updatePerformance: (
+    topicId: string,
     subtopicId: string,
-    data: { questions_solved: number; questions_correct: number }
+    data: {
+      questions_correct: number;
+      mistake_count: number;
+    }
+  ) => Promise<void>;
+  updateMastery: (
+    topicId: string,
+    subtopicId: string,
+    mastery_level: MasteryLevel
+  ) => Promise<void>;
+  updateConfidence: (
+    topicId: string,
+    subtopicId: string,
+    confidence_level: number
   ) => Promise<void>;
   saveNotes: (topicId: string, subtopicId: string, data: SaveNotesData) => Promise<SubTopic>;
   uploadFile: (topicId: string, subtopicId: string, file: File) => Promise<SubtopicFile>;
@@ -55,16 +70,16 @@ export const useSubTopicStore = create<SubTopicState>((set) => ({
     set((state) => ({ subtopics: [...state.subtopics, res.data] }));
     return res.data;
   },
-  updateSubTopic: async (subtopicId, data) => {
-    const res = await api.put(`/subtopics/${subtopicId}`, data);
+  updateSubTopic: async (topicId, subtopicId, data) => {
+    const res = await api.put(`/topics/${topicId}/subtopics/${subtopicId}`, data);
     set((state) => ({
       subtopics: state.subtopics.map((st) =>
         st.id === subtopicId ? res.data : st
       ),
     }));
   },
-  deleteSubTopic: async (subtopicId) => {
-    await api.delete(`/subtopics/${subtopicId}`);
+  deleteSubTopic: async (topicId, subtopicId) => {
+    await api.delete(`/topics/${topicId}/subtopics/${subtopicId}`);
     set((state) => ({
       subtopics: state.subtopics.filter((st) => st.id !== subtopicId),
     }));
@@ -83,16 +98,36 @@ export const useSubTopicStore = create<SubTopicState>((set) => ({
     });
   },
   setSubtopics: (subtopics) => set({ subtopics }),
-  recordRevision: async (subtopicId) => {
-    const res = await api.post(`/subtopics/${subtopicId}/revise`);
+  recordRevision: async (topicId, subtopicId) => {
+    const res = await api.post(`/topics/${topicId}/subtopics/${subtopicId}/revision`);
     set((state) => ({
       subtopics: state.subtopics.map((st) =>
         st.id === subtopicId ? res.data : st
       ),
     }));
   },
-  updatePerformance: async (subtopicId, data) => {
-    const res = await api.put(`/subtopics/${subtopicId}/performance`, data);
+  updatePerformance: async (topicId, subtopicId, data) => {
+    const res = await api.patch(`/topics/${topicId}/subtopics/${subtopicId}/performance`, data);
+    set((state) => ({
+      subtopics: state.subtopics.map((st) =>
+        st.id === subtopicId ? res.data : st
+      ),
+    }));
+  },
+  updateMastery: async (topicId, subtopicId, mastery_level) => {
+    const res = await api.put(`/topics/${topicId}/subtopics/${subtopicId}`, {
+      mastery_level,
+    });
+    set((state) => ({
+      subtopics: state.subtopics.map((st) =>
+        st.id === subtopicId ? res.data : st
+      ),
+    }));
+  },
+  updateConfidence: async (topicId, subtopicId, confidence_level) => {
+    const res = await api.put(`/topics/${topicId}/subtopics/${subtopicId}`, {
+      confidence_level,
+    });
     set((state) => ({
       subtopics: state.subtopics.map((st) =>
         st.id === subtopicId ? res.data : st
