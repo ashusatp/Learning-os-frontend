@@ -3,6 +3,17 @@ export interface User {
   email: string;
   name: string;
   auth_provider: string | null;
+  ai_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Account {
+  id: string;
+  user_id: string;
+  ai_enabled: boolean;
+  ai_requests_today: number;
+  plan: string;
   created_at: string;
   updated_at: string;
 }
