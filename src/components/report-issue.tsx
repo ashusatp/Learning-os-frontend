@@ -33,6 +33,17 @@ export function ReportIssue() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Create stable object URLs and revoke on cleanup
+  const previewUrls = useMemo(
+    () => files.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : null)),
+    [files],
+  );
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach((url) => url && URL.revokeObjectURL(url));
+    };
+  }, [previewUrls]);
+
   if (!user) return null;
 
   const reset = () => {
@@ -79,17 +90,6 @@ export function ReportIssue() {
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
-
-  // Create stable object URLs and revoke on cleanup
-  const previewUrls = useMemo(
-    () => files.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : null)),
-    [files],
-  );
-  useEffect(() => {
-    return () => {
-      previewUrls.forEach((url) => url && URL.revokeObjectURL(url));
-    };
-  }, [previewUrls]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
