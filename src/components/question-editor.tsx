@@ -39,7 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { RichTextEditor, RichTextEditorRef } from "@/components/rich-text-editor";
 import { MiniEditor, MiniEditorRef } from "@/components/mini-editor";
 import { SketchBoard } from "@/components/sketchboard";
-import { FileManager } from "@/components/file-manager";
+
 import { Question, QuestionType, DifficultyLevel } from "@/types";
 import type { Editor } from "@tiptap/react";
 
@@ -304,7 +304,9 @@ function ExplanationContent({
       )}
       {explanationTab === "files" && (
         <div className={`p-4 ${fullHeight ? "flex-1 overflow-y-auto" : ""}`}>
-          <FileManager />
+          <p className="text-sm text-muted-foreground text-center py-8">
+            Files are managed at the subtopic level in the Files tab.
+          </p>
         </div>
       )}
     </div>

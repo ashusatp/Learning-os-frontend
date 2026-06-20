@@ -304,7 +304,7 @@ export function SubtopicDetailModal({
           )}
           {mode === "edit" && activeTab === "files" && (
             <div className="h-full">
-              <FileManager />
+              <FileManager topicId={subtopic.topic_id} subtopicId={subtopic.id} />
             </div>
           )}
         </div>

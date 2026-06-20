@@ -300,7 +300,11 @@ function SubtopicDetailContent() {
           <EmptyState message="No whiteboard yet. Switch to edit mode to start drawing." />
         );
       case "files":
-        return <EmptyState message="No files yet. Switch to edit mode to upload files." />;
+        return (
+          <div className="h-full">
+            <FileManager topicId={topicId} subtopicId={subtopicId} readOnly />
+          </div>
+        );
       case "questions":
         return <QuestionList subtopicId={subtopicId} readOnly />;
       case "mistakes":
@@ -471,7 +475,7 @@ function SubtopicDetailContent() {
                 )}
                 {activeTab === "files" && (
                   <div className="h-full">
-                    <FileManager />
+                    <FileManager topicId={topicId} subtopicId={subtopicId} />
                   </div>
                 )}
                 {activeTab === "questions" && (

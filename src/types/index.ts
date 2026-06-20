@@ -54,11 +54,25 @@ export type MasteryLevel =
 export interface SubtopicFile {
   id: string;
   subtopic_id: string;
+  folder_id: string | null;
   name: string;
   original_name: string;
   content_type: string;
   size: number;
   created_at: string;
+}
+
+export interface SubtopicFolder {
+  id: string;
+  subtopic_id: string;
+  parent_id: string | null;
+  name: string;
+  created_at: string;
+}
+
+export interface FolderContents {
+  folders: SubtopicFolder[];
+  files: SubtopicFile[];
 }
 
 export type QuestionType =
