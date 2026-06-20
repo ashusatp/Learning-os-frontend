@@ -99,6 +99,30 @@ export interface Question {
   updated_at: string;
 }
 
+export type MistakeType =
+  | "CONCEPTUAL"
+  | "SILLY"
+  | "CALCULATION"
+  | "MISREAD"
+  | "TIME_PRESSURE"
+  | "OTHER";
+
+export interface Mistake {
+  id: string;
+  subtopic_id: string;
+  question_id: string | null;
+  mistake_type: MistakeType;
+  description_html: string;
+  correction_html: string | null;
+  tags: string[];
+  is_resolved: boolean;
+  resolved_at: string | null;
+  revision_count: number;
+  last_revised_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SubTopic {
   id: string;
   topic_id: string;

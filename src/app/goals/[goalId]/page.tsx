@@ -11,6 +11,7 @@ import { AuthGuard } from "@/components/auth-guard";
 import { useAuthStore } from "@/stores/auth-store";
 import { useGoalStore } from "@/stores/goal-store";
 import { useSubjectStore } from "@/stores/subject-store";
+import { LogMistakeDialog } from "@/components/log-mistake-dialog";
 
 const subjectFields: FieldConfig[] = [
   {
@@ -85,12 +86,15 @@ function GoalDetailContent() {
               </p>
             )}
           </div>
-          <CreateDialog
-            title="Subject"
-            description="Add a new subject to this goal."
-            fields={subjectFields}
-            onSubmit={handleCreateSubject}
-          />
+          <div className="flex items-center gap-2">
+            <LogMistakeDialog goalId={goalId} />
+            <CreateDialog
+              title="Subject"
+              description="Add a new subject to this goal."
+              fields={subjectFields}
+              onSubmit={handleCreateSubject}
+            />
+          </div>
         </div>
 
         {loading && <SubjectListSkeleton count={4} />}

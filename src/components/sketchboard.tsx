@@ -36,6 +36,7 @@ import {
   PenLine,
   GripHorizontal,
   ChevronDown,
+  Maximize2,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════
@@ -115,6 +116,7 @@ interface SketchBoardProps {
   initialData?: string;
   onChange?: (data: string) => void;
   readOnly?: boolean;
+  onFullscreen?: () => void;
 }
 
 // ═══════════════════════════════════════════
@@ -649,7 +651,7 @@ function renderCanvas(
 // Component
 // ═══════════════════════════════════════════
 
-export function SketchBoard({ initialData, onChange, readOnly = false }: SketchBoardProps) {
+export function SketchBoard({ initialData, onChange, readOnly = false, onFullscreen }: SketchBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1867,6 +1869,17 @@ export function SketchBoard({ initialData, onChange, readOnly = false }: SketchB
           >
             {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
+
+          {/* Fullscreen */}
+          {onFullscreen && (
+            <button
+              onClick={onFullscreen}
+              title="Fullscreen"
+              className={cornerBtn}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>}
 
         {/* ReadOnly: laser pointer + theme controls */}
@@ -1913,6 +1926,15 @@ export function SketchBoard({ initialData, onChange, readOnly = false }: SketchB
             >
               {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
             </button>
+            {onFullscreen && (
+              <button
+                onClick={onFullscreen}
+                title="Fullscreen"
+                className={cornerBtn}
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         )}
 

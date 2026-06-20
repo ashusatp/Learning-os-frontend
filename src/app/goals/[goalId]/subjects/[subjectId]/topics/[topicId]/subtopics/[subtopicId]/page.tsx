@@ -8,30 +8,21 @@ import {
   Pencil,
   FolderOpen,
   RotateCcw,
-  CheckCircle,
-  XCircle,
-  Clock,
   PencilLine,
   Eye,
   Save,
   Loader2,
   BarChart3,
-  Plus,
-  Minus,
   HelpCircle,
+  AlertTriangle,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -47,6 +38,7 @@ import { SketchBoard } from "@/components/sketchboard";
 import { FileManager } from "@/components/file-manager";
 import { SubtopicNotesViewer } from "@/components/subtopic-notes-viewer";
 import { QuestionList } from "@/components/question-list";
+import { MistakeList } from "@/components/mistake-list";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuthStore } from "@/stores/auth-store";
 import { useGoalStore } from "@/stores/goal-store";
@@ -54,10 +46,11 @@ import { useSubjectStore } from "@/stores/subject-store";
 import { useTopicStore } from "@/stores/topic-store";
 import { useSubTopicStore } from "@/stores/subtopic-store";
 import { useQuestionStore } from "@/stores/question-store";
+import { useMistakeStore } from "@/stores/mistake-store";
 import { MasteryLevel } from "@/types";
 
 type Mode = "view" | "edit";
-type Tab = "notes" | "sketchboard" | "whiteboard" | "files" | "questions";
+type Tab = "notes" | "sketchboard" | "whiteboard" | "files" | "questions" | "mistakes";
 
 const AUTO_SAVE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
@@ -67,6 +60,7 @@ const tabsDef: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "whiteboard", label: "Whiteboard", icon: <PenTool className="h-4 w-4" /> },
   { id: "files", label: "Files", icon: <FolderOpen className="h-4 w-4" /> },
   { id: "questions", label: "Questions", icon: <HelpCircle className="h-4 w-4" /> },
+  { id: "mistakes", label: "Mistakes", icon: <AlertTriangle className="h-4 w-4" /> },
 ];
 
 const masteryOptions: { value: MasteryLevel; label: string; className: string }[] = [
@@ -107,14 +101,15 @@ function SubtopicDetailContent() {
     fetchSubTopics,
     saveNotes,
     recordRevision,
-    updatePerformance,
     updateMastery,
     updateConfidence,
   } = useSubTopicStore();
   const { questions, fetchQuestions } = useQuestionStore();
+  const { mistakes, fetchMistakes } = useMistakeStore();
 
   const [mode, setMode] = useState<Mode>("view");
   const [activeTab, setActiveTab] = useState<Tab>("notes");
+  const [fullscreen, setFullscreen] = useState<"notes" | "sketch" | null>(null);
 
   // Notes content — initialised from server data
   const [notesHtml, setNotesHtml] = useState("");
@@ -160,7 +155,8 @@ function SubtopicDetailContent() {
 
   useEffect(() => {
     fetchQuestions(subtopicId);
-  }, [subtopicId, fetchQuestions]);
+    fetchMistakes(subtopicId);
+  }, [subtopicId, fetchQuestions, fetchMistakes]);
 
   const subtopic = subtopics.find((st) => st.id === subtopicId);
 
@@ -236,10 +232,6 @@ function SubtopicDetailContent() {
   }, [handleSave]);
 
   const mastery = subtopic ? masteryConfig[subtopic.mastery_level] : null;
-  const accuracy =
-    subtopic && subtopic.questions_solved > 0
-      ? Math.round((subtopic.questions_correct / subtopic.questions_solved) * 100)
-      : 0;
   const confidencePercent = subtopic
     ? Math.round(subtopic.confidence_level * 100)
     : 0;
@@ -261,57 +253,36 @@ function SubtopicDetailContent() {
   const hasWhiteboard = !!whiteboardDataUrl;
   const hasFiles = (subtopic?.files?.length ?? 0) > 0;
   const questionCount = questions.length;
+  const mistakeCount = mistakes.filter((m) => !m.is_resolved).length;
   const fileCount = subtopic?.files?.length ?? 0;
 
-  // Collect available content indicators (excluding the currently active tab)
-  const contentIndicators: { tab: Tab; icon: React.ReactNode; label: string; detail: string; preview?: React.ReactNode }[] = [];
-  if (hasSketch && activeTab !== "sketchboard") {
-    contentIndicators.push({
-      tab: "sketchboard",
-      icon: <Pencil className="h-4 w-4 text-orange-500" />,
-      label: "Sketch",
-      detail: "Hand-drawn sketch available",
-    });
-  }
-  if (hasWhiteboard && activeTab !== "whiteboard") {
-    contentIndicators.push({
-      tab: "whiteboard",
-      icon: <PenTool className="h-4 w-4 text-blue-500" />,
-      label: "Whiteboard",
-      detail: "Whiteboard drawing available",
-    });
-  }
-  if (questionCount > 0 && activeTab !== "questions") {
-    contentIndicators.push({
-      tab: "questions",
-      icon: <HelpCircle className="h-4 w-4 text-purple-500" />,
-      label: "Questions",
-      detail: `${questionCount} question${questionCount !== 1 ? "s" : ""}`,
-    });
-  }
-  if (hasFiles && activeTab !== "files") {
-    contentIndicators.push({
-      tab: "files",
-      icon: <FolderOpen className="h-4 w-4 text-green-500" />,
-      label: "Files",
-      detail: `${fileCount} file${fileCount !== 1 ? "s" : ""} attached`,
-    });
-  }
+  // Content availability flags for badge dots
+  const tabHasContent: Partial<Record<Tab, boolean>> = {
+    notes: !!notesHtml && notesHtml !== "<p></p>",
+    sketchboard: hasSketch,
+    whiteboard: hasWhiteboard,
+    questions: questionCount > 0,
+    mistakes: mistakes.length > 0,
+    files: hasFiles,
+  };
 
   const viewContent = () => {
     switch (activeTab) {
       case "notes":
         return (
-          <SubtopicNotesViewer
-            notesHtml={notesHtml}
-            sketchDataUrl={undefined}
-            whiteboardDataUrl={undefined}
-          />
+          <div className="h-full relative">
+            <SubtopicNotesViewer
+              notesHtml={notesHtml}
+              sketchDataUrl={undefined}
+              whiteboardDataUrl={undefined}
+            />
+            <FullscreenButton onClick={() => setFullscreen("notes")} />
+          </div>
         );
       case "sketchboard":
         return sketchDataUrl ? (
           <div className="h-full">
-            <SketchBoard initialData={sketchDataUrl} readOnly />
+            <SketchBoard initialData={sketchDataUrl} readOnly onFullscreen={() => setFullscreen("sketch")} />
           </div>
         ) : (
           <EmptyState message="No sketch yet. Switch to edit mode to start drawing." />
@@ -328,6 +299,8 @@ function SubtopicDetailContent() {
         return <EmptyState message="No files yet. Switch to edit mode to upload files." />;
       case "questions":
         return <QuestionList subtopicId={subtopicId} readOnly />;
+      case "mistakes":
+        return <MistakeList subtopicId={subtopicId} readOnly />;
     }
   };
 
@@ -363,16 +336,12 @@ function SubtopicDetailContent() {
                   {subtopic.revision_count} rev
                 </span>
                 <span className="flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
-                  {subtopic.questions_solved > 0 ? `${accuracy}%` : "--"}
+                  <HelpCircle className="h-3 w-3" />
+                  {questions.length} Qs
                 </span>
                 <span className="flex items-center gap-1">
-                  <XCircle className="h-3 w-3 text-red-500" />
-                  {subtopic.mistake_count} mistakes
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {subtopic.questions_correct}/{subtopic.questions_solved}
+                  <AlertTriangle className="h-3 w-3 text-red-500" />
+                  {mistakes.filter((m) => !m.is_resolved).length}/{mistakes.length} mistakes
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Progress value={confidencePercent} className="h-1.5 w-16" />
@@ -387,29 +356,15 @@ function SubtopicDetailContent() {
                 topicId={topicId}
                 subtopicId={subtopicId}
                 subtopic={subtopic}
+                questionCount={questions.length}
+                totalMistakes={mistakes.length}
+                resolvedMistakes={mistakes.filter((m) => m.is_resolved).length}
+                unresolvedMistakes={mistakes.filter((m) => !m.is_resolved).length}
                 onRecordRevision={() => recordRevision(topicId, subtopicId)}
-                onUpdatePerformance={(data) => updatePerformance(topicId, subtopicId, data)}
                 onUpdateMastery={(level) => updateMastery(topicId, subtopicId, level)}
                 onUpdateConfidence={(level) => updateConfidence(topicId, subtopicId, level)}
               />
             )}
-
-            {/* Content type dropdown */}
-            <Select value={activeTab} onValueChange={(v) => setActiveTab(v as Tab)}>
-              <SelectTrigger className="h-8 w-[140px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {tabsDef.map((tab) => (
-                  <SelectItem key={tab.id} value={tab.id}>
-                    <div className="flex items-center gap-2">
-                      {tab.icon}
-                      {tab.label}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             {/* Save button */}
             <Button
@@ -455,67 +410,109 @@ function SubtopicDetailContent() {
         <div className="h-[calc(100vh-10rem)]">
           {mode === "view" && (
             <div className="h-full flex gap-4">
-              <div className={`h-full ${contentIndicators.length > 0 ? "flex-1 min-w-0" : "w-full"}`}>
+              <div className="h-full flex-1 min-w-0">
                 {viewContent()}
               </div>
-              {contentIndicators.length > 0 && (
-                <div className="w-14 shrink-0 flex flex-col gap-2 pt-1">
-                  {contentIndicators.map((ind) => (
-                    <button
-                      key={ind.tab}
-                      onClick={() => setActiveTab(ind.tab)}
-                      className="group relative flex flex-col items-center gap-1 rounded-lg border border-border/60 bg-muted/40 p-2 hover:bg-accent hover:border-border transition-colors"
-                      title={ind.detail}
-                    >
-                      {ind.icon}
-                      <span className="text-[9px] font-medium text-muted-foreground group-hover:text-foreground leading-tight">
-                        {ind.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {initialised && (
-            <div className={mode === "edit" && activeTab === "notes" ? "h-full" : "hidden"}>
-              <RichTextEditor
-                content={notesHtml}
-                onChange={setNotesHtml}
-                placeholder="Write your study notes here..."
+              <SideTabNav
+                tabs={tabsDef}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                tabHasContent={tabHasContent}
               />
             </div>
           )}
 
-          {mode === "edit" && activeTab === "sketchboard" && initialised && (
-            <div className="h-full">
-              <SketchBoard
-                initialData={sketchDataUrl}
-                onChange={setSketchDataUrl}
+          {mode === "edit" && (
+            <div className="h-full flex gap-4">
+              <div className="h-full flex-1 min-w-0">
+                {initialised && (
+                  <div className={activeTab === "notes" ? "h-full relative" : "hidden"}>
+                    <RichTextEditor
+                      content={notesHtml}
+                      onChange={setNotesHtml}
+                      placeholder="Write your study notes here..."
+                    />
+                    <FullscreenButton onClick={() => setFullscreen("notes")} />
+                  </div>
+                )}
+
+                {activeTab === "sketchboard" && initialised && (
+                  <div className="h-full">
+                    <SketchBoard
+                      initialData={sketchDataUrl}
+                      onChange={setSketchDataUrl}
+                      onFullscreen={() => setFullscreen("sketch")}
+                    />
+                  </div>
+                )}
+                {activeTab === "whiteboard" && initialised && (
+                  <div className="h-full">
+                    <Whiteboard
+                      initialData={whiteboardDataUrl}
+                      onChange={setWhiteboardDataUrl}
+                    />
+                  </div>
+                )}
+                {activeTab === "files" && (
+                  <div className="h-full">
+                    <FileManager />
+                  </div>
+                )}
+                {activeTab === "questions" && (
+                  <div className="h-full overflow-y-auto">
+                    <QuestionList subtopicId={subtopicId} />
+                  </div>
+                )}
+                {activeTab === "mistakes" && (
+                  <div className="h-full overflow-y-auto">
+                    <MistakeList subtopicId={subtopicId} />
+                  </div>
+                )}
+              </div>
+              <SideTabNav
+                tabs={tabsDef}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                tabHasContent={tabHasContent}
               />
-            </div>
-          )}
-          {mode === "edit" && activeTab === "whiteboard" && initialised && (
-            <div className="h-full">
-              <Whiteboard
-                initialData={whiteboardDataUrl}
-                onChange={setWhiteboardDataUrl}
-              />
-            </div>
-          )}
-          {mode === "edit" && activeTab === "files" && (
-            <div className="h-full">
-              <FileManager />
-            </div>
-          )}
-          {activeTab === "questions" && mode === "edit" && (
-            <div className="h-full overflow-y-auto">
-              <QuestionList subtopicId={subtopicId} />
             </div>
           )}
         </div>
       </main>
+
+      {/* Fullscreen overlays */}
+      {fullscreen === "notes" && (
+        <FullscreenOverlay title="Notes" onClose={() => setFullscreen(null)}>
+          {mode === "edit" ? (
+            <RichTextEditor
+              content={notesHtml}
+              onChange={setNotesHtml}
+              placeholder="Write your study notes here..."
+            />
+          ) : (
+            <div className="h-full overflow-y-auto p-6">
+              <SubtopicNotesViewer
+                notesHtml={notesHtml}
+                sketchDataUrl={undefined}
+                whiteboardDataUrl={undefined}
+              />
+            </div>
+          )}
+        </FullscreenOverlay>
+      )}
+
+      {fullscreen === "sketch" && (
+        <FullscreenOverlay title="Sketchboard" onClose={() => setFullscreen(null)}>
+          {mode === "edit" ? (
+            <SketchBoard
+              initialData={sketchDataUrl}
+              onChange={setSketchDataUrl}
+            />
+          ) : (
+            <SketchBoard initialData={sketchDataUrl} readOnly />
+          )}
+        </FullscreenOverlay>
+      )}
     </div>
   );
 }
@@ -533,39 +530,37 @@ interface StatsPanelProps {
     questions_solved: number;
     questions_correct: number;
     mistake_count: number;
+    created_at: string;
+    updated_at: string;
   };
+  questionCount: number;
+  totalMistakes: number;
+  resolvedMistakes: number;
+  unresolvedMistakes: number;
   onRecordRevision: () => Promise<void>;
-  onUpdatePerformance: (data: {
-    questions_correct: number;
-    mistake_count: number;
-  }) => Promise<void>;
   onUpdateMastery: (level: MasteryLevel) => Promise<void>;
   onUpdateConfidence: (level: number) => Promise<void>;
 }
 
 function StatsPanel({
   subtopic,
+  questionCount,
+  totalMistakes,
+  resolvedMistakes,
+  unresolvedMistakes,
   onRecordRevision,
-  onUpdatePerformance,
   onUpdateMastery,
   onUpdateConfidence,
 }: StatsPanelProps) {
   const [saving, setSaving] = useState<string | null>(null);
 
-  // Local form state for performance fields
-  const [correct, setCorrect] = useState(subtopic.questions_correct);
-  const [mistakes, setMistakes] = useState(subtopic.mistake_count);
-  const solved = correct + mistakes;
   const [confidence, setConfidence] = useState(
     Math.round(subtopic.confidence_level * 100)
   );
 
-  // Sync local state when subtopic changes (e.g. after save)
   useEffect(() => {
-    setCorrect(subtopic.questions_correct);
-    setMistakes(subtopic.mistake_count);
     setConfidence(Math.round(subtopic.confidence_level * 100));
-  }, [subtopic.questions_correct, subtopic.mistake_count, subtopic.confidence_level]);
+  }, [subtopic.confidence_level]);
 
   const handleRevision = async () => {
     setSaving("revision");
@@ -586,18 +581,6 @@ function StatsPanel({
     }
   };
 
-  const handlePerformanceSave = async () => {
-    setSaving("performance");
-    try {
-      await onUpdatePerformance({
-        questions_correct: correct,
-        mistake_count: mistakes,
-      });
-    } finally {
-      setSaving(null);
-    }
-  };
-
   const handleConfidenceSave = async () => {
     setSaving("confidence");
     try {
@@ -607,15 +590,8 @@ function StatsPanel({
     }
   };
 
-  const perfDirty =
-    correct !== subtopic.questions_correct ||
-    mistakes !== subtopic.mistake_count;
-
   const confDirty =
     confidence !== Math.round(subtopic.confidence_level * 100);
-
-  const accuracy =
-    solved > 0 ? Math.round((correct / solved) * 100) : 0;
 
   return (
     <Sheet>
@@ -718,73 +694,68 @@ function StatsPanel({
             )}
           </div>
 
-          {/* Performance */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Performance</Label>
-              {accuracy > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  Accuracy: {accuracy}%
+          {/* Content */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Content</Label>
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+              <span className="text-sm">Questions</span>
+              <span className="text-sm font-medium tabular-nums">{questionCount}</span>
+            </div>
+          </div>
+
+          {/* Mistakes */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Mistakes</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border p-3 text-center">
+                <div className="text-xl font-bold">{totalMistakes}</div>
+                <div className="text-[10px] text-muted-foreground">Total</div>
+              </div>
+              <div className="rounded-lg border p-3 text-center">
+                <div className="text-xl font-bold text-red-500">{unresolvedMistakes}</div>
+                <div className="text-[10px] text-muted-foreground">Unresolved</div>
+              </div>
+              <div className="rounded-lg border p-3 text-center">
+                <div className="text-xl font-bold text-green-500">{resolvedMistakes}</div>
+                <div className="text-[10px] text-muted-foreground">Resolved</div>
+              </div>
+            </div>
+            {totalMistakes > 0 && (
+              <div className="flex items-center gap-2">
+                <Progress
+                  value={Math.round((resolvedMistakes / totalMistakes) * 100)}
+                  className="h-1.5 flex-1"
+                />
+                <span className="text-[10px] text-muted-foreground tabular-nums">
+                  {Math.round((resolvedMistakes / totalMistakes) * 100)}% resolved
                 </span>
+              </div>
+            )}
+          </div>
+
+          {/* Timestamps */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Timeline</Label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Created</span>
+                <span className="tabular-nums">{new Date(subtopic.created_at).toLocaleDateString()}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Last updated</span>
+                <span className="tabular-nums">{new Date(subtopic.updated_at).toLocaleDateString()}</span>
+              </div>
+              {subtopic.last_revised_at && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Last revised</span>
+                  <span className="tabular-nums">{new Date(subtopic.last_revised_at).toLocaleDateString()}</span>
+                </div>
               )}
             </div>
-
-            <StatCounter label="Correct Answers" value={correct} onChange={setCorrect} />
-            <StatCounter label="Mistakes" value={mistakes} onChange={setMistakes} />
-            <div className="flex items-center justify-between rounded-lg border border-dashed px-3 py-2 text-muted-foreground">
-              <span className="text-sm">Total Solved</span>
-              <span className="text-sm font-medium tabular-nums">{solved}</span>
-            </div>
-
-            {perfDirty && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full text-xs"
-                onClick={handlePerformanceSave}
-                disabled={saving === "performance"}
-              >
-                {saving === "performance" && (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                )}
-                Save Performance
-              </Button>
-            )}
           </div>
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function StatCounter({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border px-3 py-2">
-      <span className="text-sm">{label}</span>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => onChange(Math.max(0, value - 1))}
-          className="h-6 w-6 rounded border border-border flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-        >
-          <Minus className="h-3 w-3" />
-        </button>
-        <span className="w-8 text-center text-sm font-medium tabular-nums">{value}</span>
-        <button
-          onClick={() => onChange(value + 1)}
-          className="h-6 w-6 rounded border border-border flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-        >
-          <Plus className="h-3 w-3" />
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -795,6 +766,110 @@ function EmptyState({ message }: { message: string }) {
         <FileText className="h-7 w-7 text-muted-foreground" />
       </div>
       <p className="text-sm text-muted-foreground max-w-xs">{message}</p>
+    </div>
+  );
+}
+
+// ── Fullscreen helpers ──
+
+function FullscreenOverlay({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+      <div className="flex items-center justify-between border-b px-4 py-2 shrink-0">
+        <span className="text-sm font-medium">{title}</span>
+        <Button variant="ghost" size="sm" onClick={onClose} className="gap-1.5 text-xs">
+          <Minimize2 className="h-3.5 w-3.5" />
+          Exit fullscreen
+        </Button>
+      </div>
+      <div className="flex-1 overflow-hidden">{children}</div>
+    </div>
+  );
+}
+
+function FullscreenButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="absolute top-2 right-2 z-10 p-1.5 rounded-md border border-border/60 bg-background/80 backdrop-blur text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+      title="Fullscreen"
+    >
+      <Maximize2 className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+// ── Side Tab Navigator ──
+
+function SideTabNav({
+  tabs,
+  activeTab,
+  onTabChange,
+  tabHasContent,
+}: {
+  tabs: { id: Tab; label: string; icon: React.ReactNode }[];
+  activeTab: Tab;
+  onTabChange: (tab: Tab) => void;
+  tabHasContent: Partial<Record<Tab, boolean>>;
+}) {
+  const activeIndex = tabs.findIndex((t) => t.id === activeTab);
+
+  return (
+    <div className="w-16 shrink-0 flex flex-col items-center relative">
+      {/* Track background */}
+      <div className="relative flex flex-col gap-1 rounded-xl border border-border/60 bg-muted/30 p-1">
+        {/* Sliding indicator */}
+        <div
+          className="absolute left-1 right-1 rounded-lg bg-background shadow-sm border border-border/80 transition-all duration-200 ease-out"
+          style={{
+            height: `${56}px`,
+            top: `${4 + activeIndex * (56 + 4)}px`,
+          }}
+        />
+
+        {tabs.map((tab) => {
+          const isActive = tab.id === activeTab;
+          const hasContent = tabHasContent[tab.id];
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className={`relative z-10 flex flex-col items-center justify-center gap-1 w-[52px] h-[56px] rounded-lg transition-colors ${
+                isActive
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground/70"
+              }`}
+              title={tab.label}
+            >
+              <div className="relative">
+                {tab.icon}
+                {hasContent && !isActive && (
+                  <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-primary" />
+                )}
+              </div>
+              <span className="text-[9px] font-medium leading-tight">
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
