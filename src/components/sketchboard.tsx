@@ -5,6 +5,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
@@ -126,6 +127,29 @@ interface SketchBoardProps {
 const GRID_SIZE = 24;
 const PAGE_W = 816;
 const PAGE_H = 1056;
+
+/** Find the rightmost extent of all elements on a single page.
+ *  Used to compute the scale factor so content always fits the canvas width. */
+function computeContentMaxX(elements: CanvasElement[]): number {
+  let maxX = 0;
+  for (const el of elements) {
+    switch (el.type) {
+      case "stroke":
+        for (const p of el.points) maxX = Math.max(maxX, p.x + el.size);
+        break;
+      case "shape":
+        maxX = Math.max(maxX, el.x1, el.x2);
+        break;
+      case "text":
+        maxX = Math.max(maxX, el.x + el.text.length * el.fontSize * 0.6);
+        break;
+      case "image":
+        maxX = Math.max(maxX, el.x + el.width);
+        break;
+    }
+  }
+  return maxX;
+}
 
 let _idCounter = 0;
 function uid() {
@@ -597,7 +621,8 @@ function renderCanvas(
   imageCache: Map<string, HTMLImageElement>,
   mode: CanvasMode,
   pageCount: number,
-  activePageIndex: number
+  activePageIndex: number,
+  contentMaxX: number
 ) {
   const dpr = window.devicePixelRatio || 1;
 
@@ -624,11 +649,14 @@ function renderCanvas(
   offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   offCtx.clearRect(0, 0, viewW, viewH);
 
+  // If content is wider than canvas, scale down uniformly to fit
+  const contentScale = contentMaxX > viewW ? viewW / contentMaxX : 1;
   if (mode === "pages") {
-    // Pages mode: elements draw directly, no offset (page = full canvas)
+    offCtx.scale(contentScale, contentScale);
   } else {
-    // Infinite mode: just vertical offset
-    offCtx.translate(0, camera.y);
+    // Infinite mode: scale + vertical scroll
+    offCtx.scale(contentScale, contentScale);
+    offCtx.translate(0, camera.y / contentScale);
   }
 
   for (const el of elements) {
@@ -756,6 +784,10 @@ export function SketchBoard({ initialData, onChange, readOnly = false, onFullscr
 
   // ── Helpers ──
 
+  // Compute the rightmost extent of drawn content on the active page.
+  // If content is wider than the canvas, we scale everything down to fit.
+  const contentMaxX = useMemo(() => computeContentMaxX(elements), [elements]);
+
   const notifyChange = useCallback(
     (newPages: Page[]) => {
       onChange?.(JSON.stringify({ pages: newPages, mode: canvasMode }));
@@ -769,19 +801,20 @@ export function SketchBoard({ initialData, onChange, readOnly = false, onFullscr
       const rect = canvas.getBoundingClientRect();
       const localX = sx - rect.left;
       const localY = sy - rect.top;
+      // If content overflows canvas width, scale down to fit
+      const contentScale = contentMaxX > rect.width ? rect.width / contentMaxX : 1;
 
       if (canvasMode === "pages") {
-        // Page fills the canvas — direct coordinates
-        return { x: localX, y: localY };
+        return { x: localX / contentScale, y: localY / contentScale };
       }
 
-      // Infinite mode: vertical scroll only
+      // Infinite mode: vertical scroll + scale
       return {
-        x: localX,
-        y: localY - camera.y,
+        x: localX / contentScale,
+        y: (localY - camera.y) / contentScale,
       };
     },
-    [camera, canvasMode, activePageIndex]
+    [camera, canvasMode, contentMaxX]
   );
 
   // ── Offscreen canvas ──
@@ -839,9 +872,10 @@ export function SketchBoard({ initialData, onChange, readOnly = false, onFullscr
       imageCacheRef.current,
       canvasMode,
       pages.length,
-      activePageIndex
+      activePageIndex,
+      contentMaxX
     );
-  }, [elements, camera, canvasTheme, background, ensureOffscreen, canvasMode, pages.length, activePageIndex]);
+  }, [elements, camera, canvasTheme, background, ensureOffscreen, canvasMode, pages.length, activePageIndex, contentMaxX]);
 
   useEffect(() => {
     redraw();
@@ -1310,10 +1344,10 @@ export function SketchBoard({ initialData, onChange, readOnly = false, onFullscr
           const canvas = canvasRef.current;
           if (!canvas) return;
           const rect = canvas.getBoundingClientRect();
-          const cx = rect.width / 2;
-          const cy = rect.height / 2;
-          const wx = cx / camera.zoom - camera.x;
-          const wy = cy / camera.zoom - camera.y;
+          // Place at center of current view (in virtual coords)
+          const centerWorld = screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          const wx = centerWorld.x;
+          const wy = centerWorld.y;
           // Scale down large images
           let w = img.naturalWidth;
           let h = img.naturalHeight;
@@ -1344,7 +1378,7 @@ export function SketchBoard({ initialData, onChange, readOnly = false, onFullscr
       reader.readAsDataURL(file);
       e.target.value = "";
     },
-    [elements, setElements, camera, pages, activePageIndex, notifyChange]
+    [elements, setElements, screenToWorld, pages, activePageIndex, notifyChange]
   );
 
   // ── Pages ──
@@ -1608,7 +1642,7 @@ export function SketchBoard({ initialData, onChange, readOnly = false, onFullscr
               }`}
               placeholder="Type here..."
               rows={2}
-              style={{ fontSize: Math.max(14, size * 5) * camera.zoom }}
+              style={{ fontSize: Math.max(14, size * 5) * (containerRef.current && contentMaxX > containerRef.current.getBoundingClientRect().width ? containerRef.current.getBoundingClientRect().width / contentMaxX : 1) }}
             />
           </div>
         )}
