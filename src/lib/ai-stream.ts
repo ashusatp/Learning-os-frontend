@@ -61,6 +61,10 @@ export async function streamAIResponse(
             onDone();
             return;
           }
+          if (data.error) {
+            onError(data.error);
+            return;
+          }
           if (data.content) {
             onChunk(data.content);
           }

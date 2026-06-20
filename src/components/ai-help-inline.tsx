@@ -46,6 +46,8 @@ export function AIHelpInline({
   const abortRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  messagesRef.current = messages;
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -53,15 +55,22 @@ export function AIHelpInline({
 
   useEffect(() => {
     inputRef.current?.focus();
+    return () => {
+      // Abort any in-flight stream on unmount
+      abortRef.current?.abort();
+    };
   }, []);
 
   const sendMessageWithText = useCallback(
-    async (text: string, prevMessages: ChatMessage[] = messages) => {
+    async (text: string, prevMessages?: ChatMessage[]) => {
       if (!text || isStreaming) return;
 
       setError(null);
+
+      // Use provided prevMessages or get current messages from state
+      const baseMsgs = prevMessages ?? messagesRef.current;
       const userMessage: ChatMessage = { role: "user", content: text };
-      const newMessages = [...prevMessages, userMessage];
+      const newMessages = [...baseMsgs, userMessage];
       setMessages(newMessages);
       setInput("");
       setIsStreaming(true);
@@ -112,7 +121,7 @@ export function AIHelpInline({
         abortController.signal,
       );
     },
-    [isStreaming, messages, hierarchy, currentNotesHtml],
+    [isStreaming, hierarchy, currentNotesHtml, selectedText],
   );
 
   const sendMessage = useCallback(() => {
