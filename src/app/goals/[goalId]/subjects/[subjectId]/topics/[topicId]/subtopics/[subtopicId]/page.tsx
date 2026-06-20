@@ -64,11 +64,11 @@ const tabsDef: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 const masteryOptions: { value: MasteryLevel; label: string; className: string }[] = [
-  { value: "NOT_STARTED", label: "Not Started", className: "bg-muted text-muted-foreground" },
-  { value: "BEGINNER", label: "Beginner", className: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" },
-  { value: "INTERMEDIATE", label: "Intermediate", className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
-  { value: "ADVANCED", label: "Advanced", className: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
-  { value: "MASTERED", label: "Mastered", className: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400" },
+  { value: "NOT_STARTED", label: "Not Started", className: "bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300" },
+  { value: "BEGINNER", label: "Beginner", className: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" },
+  { value: "INTERMEDIATE", label: "Intermediate", className: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
+  { value: "ADVANCED", label: "Advanced", className: "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300" },
+  { value: "MASTERED", label: "Mastered", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
 ];
 
 const masteryConfig: Record<MasteryLevel, { label: string; className: string }> = Object.fromEntries(
@@ -641,7 +641,7 @@ function StatsPanel({
                 <div className="text-2xl font-bold">{subtopic.revision_count}</div>
                 <div className="text-xs text-muted-foreground">
                   {subtopic.last_revised_at
-                    ? `Last: ${new Date(subtopic.last_revised_at).toLocaleDateString()}`
+                    ? `Last: ${new Date(subtopic.last_revised_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
                     : "Never revised"}
                 </div>
               </div>
@@ -739,16 +739,16 @@ function StatsPanel({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Created</span>
-                <span className="tabular-nums">{new Date(subtopic.created_at).toLocaleDateString()}</span>
+                <span className="tabular-nums">{new Date(subtopic.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Last updated</span>
-                <span className="tabular-nums">{new Date(subtopic.updated_at).toLocaleDateString()}</span>
+                <span className="tabular-nums">{new Date(subtopic.updated_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
               </div>
               {subtopic.last_revised_at && (
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Last revised</span>
-                  <span className="tabular-nums">{new Date(subtopic.last_revised_at).toLocaleDateString()}</span>
+                  <span className="tabular-nums">{new Date(subtopic.last_revised_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
                 </div>
               )}
             </div>

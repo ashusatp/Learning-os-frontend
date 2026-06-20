@@ -576,10 +576,17 @@ function TableMenu({
 // ── Font Family Dropdown ──
 
 const FONT_FAMILIES = [
-  { label: "Default", value: "" },
-  { label: "Serif", value: "Georgia, serif" },
-  { label: "Mono", value: "ui-monospace, monospace" },
-  { label: "Cursive", value: "'Segoe Script', cursive" },
+  { label: "Default (Sans)", value: "" },
+  { label: "Inter", value: "'Inter', sans-serif" },
+  { label: "Georgia", value: "Georgia, serif" },
+  { label: "Times New Roman", value: "'Times New Roman', serif" },
+  { label: "Garamond", value: "'Garamond', serif" },
+  { label: "Courier New", value: "'Courier New', monospace" },
+  { label: "Fira Code", value: "'Fira Code', monospace" },
+  { label: "Comic Sans", value: "'Comic Sans MS', cursive" },
+  { label: "Trebuchet MS", value: "'Trebuchet MS', sans-serif" },
+  { label: "Verdana", value: "'Verdana', sans-serif" },
+  { label: "Palatino", value: "'Palatino Linotype', serif" },
 ];
 
 function FontFamilyMenu({
@@ -590,26 +597,30 @@ function FontFamilyMenu({
   onClose: () => void;
 }) {
   if (!editor) return null;
-  const item =
-    "w-full text-left text-sm px-3 py-1.5 rounded-md hover:bg-accent";
+  const currentFont = editor.getAttributes("textStyle")?.fontFamily || "";
 
   return (
-    <div className="absolute top-full left-0 mt-1 z-50 bg-popover border rounded-lg shadow-lg p-1 min-w-[140px]">
-      {FONT_FAMILIES.map((f) => (
-        <button
-          key={f.value || "default"}
-          onClick={() => {
-            f.value
-              ? editor.chain().focus().setFontFamily(f.value).run()
-              : editor.chain().focus().unsetFontFamily().run();
-            onClose();
-          }}
-          className={item}
-          style={{ fontFamily: f.value || undefined }}
-        >
-          {f.label}
-        </button>
-      ))}
+    <div className="absolute top-full left-0 mt-1 z-50 bg-popover border rounded-lg shadow-lg p-1 min-w-[200px] max-h-[300px] overflow-y-auto">
+      {FONT_FAMILIES.map((f) => {
+        const isActive = f.value ? currentFont === f.value : !currentFont;
+        return (
+          <button
+            key={f.value || "default"}
+            onClick={() => {
+              f.value
+                ? editor.chain().focus().setFontFamily(f.value).run()
+                : editor.chain().focus().unsetFontFamily().run();
+              onClose();
+            }}
+            className={`w-full text-left text-sm px-3 py-1.5 rounded-md hover:bg-accent transition-colors ${
+              isActive ? "bg-primary/10 text-primary font-medium" : ""
+            }`}
+            style={{ fontFamily: f.value || undefined }}
+          >
+            {f.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -783,14 +794,27 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
           {/* Font family */}
           <div className="relative">
-            <TBtn
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => togglePop("font")}
-              isActive={pop === "font"}
               title="Font Family"
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-xs transition-colors ${
+                pop === "font"
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
             >
               <Type className={I} />
-              <ChevronDown className="h-3 w-3 ml-0.5 -mr-0.5" />
-            </TBtn>
+              <span className="max-w-[80px] truncate hidden sm:inline">
+                {(() => {
+                  const cf = editor.getAttributes("textStyle")?.fontFamily || "";
+                  const match = FONT_FAMILIES.find((f) => f.value === cf);
+                  return match?.label || "Default";
+                })()}
+              </span>
+              <ChevronDown className="h-3 w-3 -mr-0.5" />
+            </button>
             {pop === "font" && (
               <FontFamilyMenu editor={editor} onClose={closePop} />
             )}
@@ -896,13 +920,23 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
           {/* Font Size */}
           <div className="relative">
-            <TBtn
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => togglePop("fontSize")}
-              isActive={pop === "fontSize"}
               title="Font Size"
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-xs transition-colors ${
+                pop === "fontSize"
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
             >
               <AArrowUp className={I} />
-            </TBtn>
+              <span className="tabular-nums hidden sm:inline">
+                {editor.getAttributes("textStyle")?.fontSize || "16px"}
+              </span>
+              <ChevronDown className="h-3 w-3 -mr-0.5" />
+            </button>
             {pop === "fontSize" && (
               <FontSizePicker editor={editor} onClose={closePop} />
             )}

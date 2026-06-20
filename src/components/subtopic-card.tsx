@@ -15,28 +15,28 @@ const masteryConfig: Record<
 > = {
   NOT_STARTED: {
     label: "Not Started",
-    badge: "bg-muted text-muted-foreground",
-    accent: "from-slate-50 to-transparent dark:from-slate-900/40",
+    badge: "bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300",
+    accent: "from-zinc-100 to-transparent dark:from-zinc-800/60",
   },
   BEGINNER: {
     label: "Beginner",
-    badge: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400",
-    accent: "from-red-50 to-transparent dark:from-red-950/30",
+    badge: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300 dark:border-violet-500/30",
+    accent: "from-violet-100 to-transparent dark:from-violet-500/15",
   },
   INTERMEDIATE: {
     label: "Intermediate",
-    badge: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
-    accent: "from-amber-50 to-transparent dark:from-amber-950/30",
+    badge: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30",
+    accent: "from-amber-100 to-transparent dark:from-amber-500/15",
   },
   ADVANCED: {
     label: "Advanced",
-    badge: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400",
-    accent: "from-blue-50 to-transparent dark:from-blue-950/30",
+    badge: "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/30",
+    accent: "from-sky-100 to-transparent dark:from-sky-500/15",
   },
   MASTERED: {
     label: "Mastered",
-    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
-    accent: "from-emerald-50 to-transparent dark:from-emerald-950/30",
+    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30",
+    accent: "from-emerald-100 to-transparent dark:from-emerald-500/15",
   },
 };
 
@@ -92,7 +92,7 @@ export function SubTopicCard({ subtopic }: SubTopicCardProps) {
         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 border-t pt-2">
           <CalendarClock className="h-3 w-3" />
           {subtopic.last_revised_at
-            ? `Revised ${new Date(subtopic.last_revised_at).toLocaleDateString()}`
+            ? `Revised ${new Date(subtopic.last_revised_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
             : "Not revised yet"}
         </div>
       </div>

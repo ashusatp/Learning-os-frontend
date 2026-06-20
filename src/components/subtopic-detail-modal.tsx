@@ -44,11 +44,11 @@ const tabsDef: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 const masteryConfig: Record<MasteryLevel, { label: string; className: string }> = {
-  NOT_STARTED: { label: "Not Started", className: "bg-muted text-muted-foreground" },
-  BEGINNER: { label: "Beginner", className: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" },
-  INTERMEDIATE: { label: "Intermediate", className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400" },
-  ADVANCED: { label: "Advanced", className: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
-  MASTERED: { label: "Mastered", className: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400" },
+  NOT_STARTED: { label: "Not Started", className: "bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300" },
+  BEGINNER: { label: "Beginner", className: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" },
+  INTERMEDIATE: { label: "Intermediate", className: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
+  ADVANCED: { label: "Advanced", className: "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300" },
+  MASTERED: { label: "Mastered", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
 };
 
 interface SubtopicDetailModalProps {

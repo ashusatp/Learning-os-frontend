@@ -281,7 +281,7 @@ function MistakeCard({
             </Badge>
           ))}
           <span className="text-[10px] text-muted-foreground">
-            {new Date(m.created_at).toLocaleDateString()}
+            {new Date(m.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           </span>
           {expanded ? (
             <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -317,7 +317,7 @@ function MistakeCard({
           {/* Resolved info */}
           {m.is_resolved && m.resolved_at && (
             <p className="text-[10px] text-green-600 dark:text-green-400">
-              Resolved on {new Date(m.resolved_at).toLocaleDateString()}
+              Resolved on {new Date(m.resolved_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
             </p>
           )}
 
