@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MistakeEditor } from "@/components/mistake-editor";
 import { useMistakeStore } from "@/stores/mistake-store";
-import { Mistake, MistakeType } from "@/types";
+import { Mistake, MistakeType, Question } from "@/types";
 
 const TYPE_LABELS: Record<MistakeType, string> = {
   CONCEPTUAL: "Conceptual",
@@ -40,9 +40,10 @@ const TYPE_STYLES: Record<MistakeType, string> = {
 interface MistakeListProps {
   subtopicId: string;
   readOnly?: boolean;
+  questions?: Question[];
 }
 
-export function MistakeList({ subtopicId, readOnly }: MistakeListProps) {
+export function MistakeList({ subtopicId, readOnly, questions }: MistakeListProps) {
   const {
     mistakes,
     loading,
@@ -138,6 +139,7 @@ export function MistakeList({ subtopicId, readOnly }: MistakeListProps) {
       <div className="w-full">
         <MistakeEditor
           mistake={editingMistake || undefined}
+          questions={questions}
           onSave={handleSave}
           onCancel={handleCancel}
           saving={saving}

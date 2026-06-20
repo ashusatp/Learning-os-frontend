@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/rich-text-editor";
-import { Mistake, MistakeType } from "@/types";
+import { Mistake, MistakeType, Question } from "@/types";
 
 const MISTAKE_TYPE_OPTIONS: { value: MistakeType; label: string }[] = [
   { value: "CONCEPTUAL", label: "Conceptual" },
@@ -28,6 +28,7 @@ const MISTAKE_TYPE_OPTIONS: { value: MistakeType; label: string }[] = [
 interface MistakeEditorProps {
   mistake?: Mistake;
   questionId?: string | null;
+  questions?: Question[];
   onSave: (data: {
     question_id?: string | null;
     mistake_type: string;
@@ -42,12 +43,16 @@ interface MistakeEditorProps {
 export function MistakeEditor({
   mistake,
   questionId,
+  questions,
   onSave,
   onCancel,
   saving,
 }: MistakeEditorProps) {
   const [mistakeType, setMistakeType] = useState<MistakeType>(
     mistake?.mistake_type || "OTHER"
+  );
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string>(
+    questionId || mistake?.question_id || ""
   );
   const [descriptionHtml, setDescriptionHtml] = useState(
     mistake?.description_html || ""
@@ -72,13 +77,15 @@ export function MistakeEditor({
   const handleSave = () => {
     if (!descriptionHtml.trim() || descriptionHtml === "<p></p>") return;
     onSave({
-      question_id: questionId ?? mistake?.question_id ?? null,
+      question_id: selectedQuestionId || null,
       mistake_type: mistakeType,
       description_html: descriptionHtml,
       correction_html: showCorrection ? correctionHtml || null : null,
       tags,
     });
   };
+
+  const selectedQuestion = questions?.find((q) => q.id === selectedQuestionId);
 
   return (
     <div className="space-y-4">
@@ -99,6 +106,28 @@ export function MistakeEditor({
             </SelectContent>
           </Select>
         </div>
+
+        {questions && questions.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground shrink-0">Question</Label>
+            <Select value={selectedQuestionId} onValueChange={(v) => setSelectedQuestionId(v ?? "")}>
+              <SelectTrigger className="h-8 w-[200px] text-xs">
+                <span className="flex-1 text-left truncate">
+                  {selectedQuestion
+                    ? `Q${selectedQuestion.order + 1}: ${selectedQuestion.text_html.replace(/<[^>]*>/g, "").slice(0, 30)}`
+                    : "None (optional)"}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {questions.map((q) => (
+                  <SelectItem key={q.id} value={q.id}>
+                    Q{q.order + 1}: {q.text_html.replace(/<[^>]*>/g, "").slice(0, 50)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Tags */}
         <div className="flex items-center gap-1.5 flex-wrap flex-1">

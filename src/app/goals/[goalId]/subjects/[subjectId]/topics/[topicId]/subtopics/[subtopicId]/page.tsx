@@ -300,7 +300,7 @@ function SubtopicDetailContent() {
       case "questions":
         return <QuestionList subtopicId={subtopicId} readOnly />;
       case "mistakes":
-        return <MistakeList subtopicId={subtopicId} readOnly />;
+        return <MistakeList subtopicId={subtopicId} readOnly questions={questions} />;
     }
   };
 
@@ -465,7 +465,7 @@ function SubtopicDetailContent() {
                 )}
                 {activeTab === "mistakes" && (
                   <div className="h-full overflow-y-auto">
-                    <MistakeList subtopicId={subtopicId} />
+                    <MistakeList subtopicId={subtopicId} questions={questions} />
                   </div>
                 )}
               </div>
