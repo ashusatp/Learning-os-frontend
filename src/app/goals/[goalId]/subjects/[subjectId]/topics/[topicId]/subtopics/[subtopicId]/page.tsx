@@ -457,7 +457,7 @@ function SubtopicDetailContent() {
                   </div>
                 )}
 
-                {activeTab === "sketchboard" && initialised && (
+                {activeTab === "sketchboard" && initialised && fullscreen !== "sketch" && (
                   <div className="h-full">
                     <SketchBoard
                       initialData={sketchDataUrl}
@@ -523,7 +523,13 @@ function SubtopicDetailContent() {
       )}
 
       {fullscreen === "sketch" && (
-        <FullscreenOverlay title="Sketchboard" onClose={() => setFullscreen(null)}>
+        <FullscreenOverlay
+          title="Sketchboard"
+          onClose={() => setFullscreen(null)}
+          onSave={mode === "edit" ? handleSave : undefined}
+          saving={isSaving}
+          dirty={isDirty}
+        >
           {mode === "edit" ? (
             <SketchBoard
               initialData={sketchDataUrl}
@@ -790,10 +796,16 @@ function EmptyState({ message }: { message: string }) {
 function FullscreenOverlay({
   title,
   onClose,
+  onSave,
+  saving,
+  dirty,
   children,
 }: {
   title: string;
   onClose: () => void;
+  onSave?: () => void;
+  saving?: boolean;
+  dirty?: boolean;
   children: React.ReactNode;
 }) {
   useEffect(() => {
@@ -808,10 +820,24 @@ function FullscreenOverlay({
     <div className="fixed inset-0 z-50 bg-background flex flex-col">
       <div className="flex items-center justify-between border-b px-4 py-2 shrink-0">
         <span className="text-sm font-medium">{title}</span>
-        <Button variant="ghost" size="sm" onClick={onClose} className="gap-1.5 text-xs">
-          <Minimize2 className="h-3.5 w-3.5" />
-          Exit fullscreen
-        </Button>
+        <div className="flex items-center gap-1.5">
+          {onSave && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onSave}
+              disabled={!dirty || saving}
+              className="gap-1.5 text-xs"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={onClose} className="gap-1.5 text-xs">
+            <Minimize2 className="h-3.5 w-3.5" />
+            Exit fullscreen
+          </Button>
+        </div>
       </div>
       <div className="flex-1 overflow-hidden">{children}</div>
     </div>

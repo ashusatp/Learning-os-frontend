@@ -799,8 +799,9 @@ export function SketchBoard({ initialData, onChange, readOnly = false, onFullscr
     (sx: number, sy: number) => {
       const canvas = canvasRef.current!;
       const rect = canvas.getBoundingClientRect();
-      const localX = sx - rect.left;
-      const localY = sy - rect.top;
+      // Clamp to canvas bounds so drawing can't extend outside
+      const localX = Math.max(0, Math.min(sx - rect.left, rect.width));
+      const localY = Math.max(0, Math.min(sy - rect.top, rect.height));
       // If content overflows canvas width, scale down to fit
       const contentScale = contentMaxX > rect.width ? rect.width / contentMaxX : 1;
 
