@@ -516,6 +516,21 @@ canvas {
   margin: 1.5rem 0;
 }
 
+/* Theme-aware text color swap: white↔black adapt to current theme */
+/* Light mode: white text → foreground */
+:root:not(.dark) .tiptap [style*="color: #ffffff"],
+:root:not(.dark) .tiptap [style*="color: #FFFFFF"],
+:root:not(.dark) .tiptap [style*="color: rgb(255, 255, 255)"] {
+  color: var(--foreground) !important;
+}
+
+/* Dark mode: black text → foreground */
+.dark .tiptap [style*="color: #000000"],
+.dark .tiptap [style*="color: #000"],
+.dark .tiptap [style*="color: rgb(0, 0, 0)"] {
+  color: var(--foreground) !important;
+}
+
 /* ── Skeleton shimmer ── */
 
 @keyframes shimmer {

@@ -51,6 +51,16 @@ export type MasteryLevel =
   | "ADVANCED"
   | "MASTERED";
 
+export interface SubtopicFile {
+  id: string;
+  subtopic_id: string;
+  name: string;
+  original_name: string;
+  content_type: string;
+  size: number;
+  created_at: string;
+}
+
 export interface SubTopic {
   id: string;
   topic_id: string;
@@ -64,6 +74,10 @@ export interface SubTopic {
   questions_solved: number;
   questions_correct: number;
   mistake_count: number;
+  notes_html: string | null;
+  sketch_data_url: string | null;
+  whiteboard_data_url: string | null;
+  files: SubtopicFile[];
   created_at: string;
   updated_at: string;
 }

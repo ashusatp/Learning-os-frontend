@@ -28,6 +28,7 @@ import Color from "@tiptap/extension-color";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import FontFamily from "@tiptap/extension-font-family";
+import { FontSize } from "@tiptap/extension-text-style/font-size";
 
 // ── Nodes ──
 import { ResizableImage } from "@/components/resizable-image-ext";
@@ -84,6 +85,8 @@ import {
   Video as YoutubeIcon,
   Upload,
   Type,
+  AArrowUp,
+  AArrowDown,
 } from "lucide-react";
 
 const lowlight = createLowlight(common);
@@ -232,6 +235,60 @@ function ColorPicker({
             style={{ backgroundColor: c.value || undefined }}
           >
             {!c.value ? "╳" : ""}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Font Size Picker ──
+
+const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72];
+
+function FontSizePicker({
+  editor,
+  onClose,
+}: {
+  editor: ReturnType<typeof useEditor>;
+  onClose: () => void;
+}) {
+  if (!editor) return null;
+
+  const currentSize = editor.getAttributes("textStyle")?.fontSize;
+  const currentNum = currentSize ? parseInt(currentSize, 10) : null;
+
+  return (
+    <div className="absolute top-full left-0 mt-1 z-50 bg-popover border rounded-lg shadow-lg p-2 min-w-[120px] space-y-1">
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
+        Font size
+      </p>
+      <button
+        onClick={() => {
+          editor.chain().focus().unsetFontSize().run();
+          onClose();
+        }}
+        className={`w-full text-left px-2 py-1 text-xs rounded hover:bg-accent transition-colors ${
+          !currentNum ? "bg-primary/10 text-primary font-medium" : "text-foreground"
+        }`}
+      >
+        Default
+      </button>
+      <div className="grid grid-cols-3 gap-0.5">
+        {FONT_SIZES.map((size) => (
+          <button
+            key={size}
+            onClick={() => {
+              editor.chain().focus().setFontSize(`${size}px`).run();
+              onClose();
+            }}
+            className={`px-2 py-1 text-xs rounded text-center hover:bg-accent transition-colors ${
+              currentNum === size
+                ? "bg-primary/10 text-primary font-medium"
+                : "text-foreground"
+            }`}
+          >
+            {size}px
           </button>
         ))}
       </div>
@@ -599,6 +656,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         Subscript,
         Superscript,
         FontFamily,
+        FontSize,
 
         // ── Nodes ──
         ResizableImage.configure({
@@ -833,6 +891,20 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             </TBtn>
             {pop === "color" && (
               <ColorPicker editor={editor} onClose={closePop} />
+            )}
+          </div>
+
+          {/* Font Size */}
+          <div className="relative">
+            <TBtn
+              onClick={() => togglePop("fontSize")}
+              isActive={pop === "fontSize"}
+              title="Font Size"
+            >
+              <AArrowUp className={I} />
+            </TBtn>
+            {pop === "fontSize" && (
+              <FontSizePicker editor={editor} onClose={closePop} />
             )}
           </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Layers, Puzzle, GripVertical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import {
   DndContext,
@@ -33,7 +33,6 @@ import { EditDialog } from "@/components/edit-dialog";
 import { ReorderDialog } from "@/components/reorder-dialog";
 import { ItemActionsMenu } from "@/components/item-actions-menu";
 import { ViewModeSwitcher, ViewMode } from "@/components/view-mode-switcher";
-import { SubtopicDetailModal } from "@/components/subtopic-detail-modal";
 import { TopicGridSkeleton, SubtopicGridSkeleton } from "@/components/page-skeleton";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuthStore } from "@/stores/auth-store";
@@ -302,6 +301,7 @@ function SortableSubtopicItem({
 function SubjectDetailContent() {
   const params = useParams<{ goalId: string; subjectId: string }>();
   const { goalId, subjectId } = params;
+  const router = useRouter();
 
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -314,10 +314,6 @@ function SubjectDetailContent() {
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
   const [editSubtopicOpen, setEditSubtopicOpen] = useState(false);
   const [editingSubtopic, setEditingSubtopic] = useState<SubTopic | null>(null);
-
-  // Detail modal state
-  const [detailSubtopic, setDetailSubtopic] = useState<SubTopic | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
 
   // Reorder dialog state
   const [reorderTopicOpen, setReorderTopicOpen] = useState(false);
@@ -489,10 +485,12 @@ function SubjectDetailContent() {
     await reorderTopics(subjectId, reordered.map((t) => t.id));
   };
 
-  // Subtopic detail modal
+  // Navigate to subtopic detail page
   const handleOpenDetail = (subtopic: SubTopic) => {
-    setDetailSubtopic(subtopic);
-    setDetailOpen(true);
+    if (!selectedTopic) return;
+    router.push(
+      `/goals/${goalId}/subjects/${subjectId}/topics/${selectedTopic.id}/subtopics/${subtopic.id}`
+    );
   };
 
   // Subtopic actions
@@ -840,14 +838,6 @@ function SubjectDetailContent() {
         />
       )}
 
-      {/* Subtopic Detail Modal */}
-      {detailSubtopic && (
-        <SubtopicDetailModal
-          subtopic={detailSubtopic}
-          open={detailOpen}
-          onOpenChange={setDetailOpen}
-        />
-      )}
     </div>
   );
 }

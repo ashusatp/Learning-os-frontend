@@ -13,12 +13,19 @@ import {
   Maximize2,
   Minimize2,
   X,
-  Eye,
   PencilLine,
+  ChevronRight,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { Whiteboard } from "@/components/whiteboard";
 import { SketchBoard } from "@/components/sketchboard";
@@ -31,7 +38,7 @@ type Tab = "notes" | "sketchboard" | "whiteboard" | "files";
 
 const tabsDef: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "notes", label: "Notes", icon: <FileText className="h-4 w-4" /> },
-  { id: "sketchboard", label: "SketchBoard", icon: <Pencil className="h-4 w-4" /> },
+  { id: "sketchboard", label: "Sketch", icon: <Pencil className="h-4 w-4" /> },
   { id: "whiteboard", label: "Whiteboard", icon: <PenTool className="h-4 w-4" /> },
   { id: "files", label: "Files", icon: <FolderOpen className="h-4 w-4" /> },
 ];
@@ -46,12 +53,14 @@ const masteryConfig: Record<MasteryLevel, { label: string; className: string }> 
 
 interface SubtopicDetailModalProps {
   subtopic: SubTopic;
+  topicName?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function SubtopicDetailModal({
   subtopic,
+  topicName,
   open,
   onOpenChange,
 }: SubtopicDetailModalProps) {
@@ -103,6 +112,46 @@ export function SubtopicDetailModal({
 
   if (!open) return null;
 
+  /** Which single section to show in view mode */
+  const viewContent = () => {
+    switch (activeTab) {
+      case "notes":
+        return (
+          <SubtopicNotesViewer
+            notesHtml={notesHtml}
+            sketchDataUrl={undefined}
+            whiteboardDataUrl={undefined}
+          />
+        );
+      case "sketchboard":
+        return sketchDataUrl ? (
+          <div className="flex items-center justify-center h-full">
+            <img
+              src={sketchDataUrl}
+              alt="Sketch"
+              className="max-w-full max-h-full object-contain rounded-lg border bg-white dark:bg-zinc-900"
+            />
+          </div>
+        ) : (
+          <EmptyState message="No sketch yet. Switch to edit mode to start drawing." />
+        );
+      case "whiteboard":
+        return whiteboardDataUrl ? (
+          <div className="flex items-center justify-center h-full">
+            <img
+              src={whiteboardDataUrl}
+              alt="Whiteboard"
+              className="max-w-full max-h-full object-contain rounded-lg border bg-white dark:bg-zinc-900"
+            />
+          </div>
+        ) : (
+          <EmptyState message="No whiteboard yet. Switch to edit mode to start drawing." />
+        );
+      case "files":
+        return <EmptyState message="No files yet. Switch to edit mode to upload files." />;
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -113,7 +162,7 @@ export function SubtopicDetailModal({
         onClick={handleClose}
       />
 
-      {/* Panel — NO css transforms, just flex centering */}
+      {/* Panel */}
       <div
         className={`relative z-10 flex flex-col bg-popover text-popover-foreground ring-1 ring-foreground/10 outline-none transition-all duration-150 select-none ${
           visible ? "opacity-100 scale-100" : "opacity-0 scale-100"
@@ -123,122 +172,59 @@ export function SubtopicDetailModal({
             : "w-[95vw] max-w-5xl h-[90vh] max-h-[90vh] rounded-xl"
         }`}
       >
-        {/* Close button */}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="absolute top-3 right-3 z-20"
-          onClick={handleClose}
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </Button>
-
-        {/* Header - hidden in fullscreen */}
-        {!isFullscreen && (
-          <div className="px-6 pt-5 pb-4 border-b shrink-0">
-            <div className="flex items-start justify-between gap-4 pr-8">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-semibold">{subtopic.name}</h2>
-                {subtopic.description && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {subtopic.description}
-                  </p>
-                )}
-              </div>
-              <Badge variant="outline" className={mastery.className}>
-                {mastery.label}
-              </Badge>
-            </div>
-
-            {/* Stats bar */}
-            <div className="flex items-center gap-6 mt-3 text-sm flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <RotateCcw className="h-3.5 w-3.5 text-primary" />
-                <span className="text-muted-foreground">Revisions:</span>
-                <span className="font-medium">{subtopic.revision_count}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                <span className="text-muted-foreground">Accuracy:</span>
-                <span className="font-medium">
-                  {subtopic.questions_solved > 0 ? `${accuracy}%` : "--"}
+        {/* ─── Top Bar ─── */}
+        <div className="flex items-center gap-3 px-5 py-3 border-b shrink-0">
+          {/* Left: breadcrumb path */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            {topicName && (
+              <>
+                <span className="text-sm text-muted-foreground truncate max-w-[150px]">
+                  {topicName}
                 </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <XCircle className="h-3.5 w-3.5 text-red-500" />
-                <span className="text-muted-foreground">Mistakes:</span>
-                <span className="font-medium">{subtopic.mistake_count}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-muted-foreground">Solved:</span>
-                <span className="font-medium">
-                  {subtopic.questions_correct}/{subtopic.questions_solved}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="text-xs text-muted-foreground">Confidence</span>
-                <Progress value={confidencePercent} className="h-2 w-24" />
-                <span className="text-xs font-medium">{confidencePercent}%</span>
-              </div>
-            </div>
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+              </>
+            )}
+            <h2 className="text-sm font-semibold truncate">{subtopic.name}</h2>
+            <Badge variant="outline" className={`ml-2 shrink-0 text-[10px] px-1.5 py-0 ${mastery.className}`}>
+              {mastery.label}
+            </Badge>
           </div>
-        )}
 
-        {/* Mode toggle + Tabs */}
-        <div className="flex items-center gap-1 px-6 pt-2 pb-0 shrink-0">
-          {/* View / Edit toggle */}
-          <div className="flex items-center bg-muted rounded-lg p-0.5 mr-3">
-            <button
-              onClick={() => setMode("view")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                mode === "view"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Eye className="h-3.5 w-3.5" />
-              View
-            </button>
-            <button
-              onClick={() => setMode("edit")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                mode === "edit"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+          {/* Right: dropdown + edit + fullscreen + close */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Content type dropdown */}
+            <Select value={activeTab} onValueChange={(v) => setActiveTab(v as Tab)}>
+              <SelectTrigger className="h-8 w-[140px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {tabsDef.map((tab) => (
+                  <SelectItem key={tab.id} value={tab.id}>
+                    <div className="flex items-center gap-2">
+                      {tab.icon}
+                      {tab.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Edit / View toggle */}
+            <Button
+              variant={mode === "edit" ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              onClick={() => setMode(mode === "view" ? "edit" : "view")}
             >
               <PencilLine className="h-3.5 w-3.5" />
-              Edit
-            </button>
-          </div>
+              {mode === "edit" ? "Viewing" : "Edit"}
+            </Button>
 
-          {/* Editor tabs — only in edit mode */}
-          {mode === "edit" && (
-            <>
-              {tabsDef.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 ${
-                    activeTab === tab.id
-                      ? "border-primary text-primary bg-primary/5"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              ))}
-            </>
-          )}
-
-          {/* Fullscreen toggle */}
-          {(mode === "view" || activeTab === "notes" || activeTab === "sketchboard" || activeTab === "whiteboard") && (
-            <button
+            {/* Fullscreen */}
+            <Button
+              variant="ghost"
+              size="icon-sm"
               onClick={() => setIsFullscreen((f) => !f)}
-              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
               title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             >
               {isFullscreen ? (
@@ -246,21 +232,55 @@ export function SubtopicDetailModal({
               ) : (
                 <Maximize2 className="h-3.5 w-3.5" />
               )}
-              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-            </button>
-          )}
+            </Button>
+
+            {/* Close */}
+            <Button variant="ghost" size="icon-sm" onClick={handleClose}>
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 min-h-0 px-6 py-4 overflow-hidden">
-          {mode === "view" && (
-            <div className="h-full">
-              <SubtopicNotesViewer
-                notesHtml={notesHtml}
-                sketchDataUrl={sketchDataUrl}
-                whiteboardDataUrl={whiteboardDataUrl}
-              />
+        {/* ─── Stats Bar (collapsed, not in fullscreen) ─── */}
+        {!isFullscreen && (
+          <div className="flex items-center gap-5 px-5 py-2 border-b text-xs flex-wrap shrink-0 bg-muted/30">
+            <div className="flex items-center gap-1.5">
+              <RotateCcw className="h-3 w-3 text-primary" />
+              <span className="text-muted-foreground">Revisions:</span>
+              <span className="font-medium">{subtopic.revision_count}</span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+              <span className="text-muted-foreground">Accuracy:</span>
+              <span className="font-medium">
+                {subtopic.questions_solved > 0 ? `${accuracy}%` : "--"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <XCircle className="h-3 w-3 text-red-500" />
+              <span className="text-muted-foreground">Mistakes:</span>
+              <span className="font-medium">{subtopic.mistake_count}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">Solved:</span>
+              <span className="font-medium">
+                {subtopic.questions_correct}/{subtopic.questions_solved}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-muted-foreground">Confidence</span>
+              <Progress value={confidencePercent} className="h-1.5 w-20" />
+              <span className="font-medium">{confidencePercent}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Content ─── */}
+        <div className="flex-1 min-h-0 px-5 py-4 overflow-hidden">
+          {mode === "view" && (
+            <div className="h-full">{viewContent()}</div>
           )}
 
           {/* Keep editor mounted (hidden when not active) to prevent content loss */}
@@ -289,6 +309,17 @@ export function SubtopicDetailModal({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-3 text-center py-16">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+        <FileText className="h-7 w-7 text-muted-foreground" />
+      </div>
+      <p className="text-sm text-muted-foreground max-w-xs">{message}</p>
     </div>
   );
 }
