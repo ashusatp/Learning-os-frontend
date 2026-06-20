@@ -21,6 +21,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -47,6 +53,7 @@ import { useTopicStore } from "@/stores/topic-store";
 import { useSubTopicStore } from "@/stores/subtopic-store";
 import { useQuestionStore } from "@/stores/question-store";
 import { useMistakeStore } from "@/stores/mistake-store";
+import api from "@/lib/api";
 import { MasteryLevel } from "@/types";
 
 type Mode = "view" | "edit";
@@ -100,9 +107,6 @@ function SubtopicDetailContent() {
     subtopics,
     fetchSubTopics,
     saveNotes,
-    recordRevision,
-    updateMastery,
-    updateConfidence,
   } = useSubTopicStore();
   const { questions, fetchQuestions, total: questionTotal } = useQuestionStore();
   const { mistakes, fetchMistakes, total: mistakeTotal } = useMistakeStore();
@@ -316,13 +320,33 @@ function SubtopicDetailContent() {
             <h1 className="text-base font-semibold truncate">
               {subtopic?.name || "Loading..."}
             </h1>
-            {mastery && (
-              <Badge
-                variant="outline"
-                className={`shrink-0 text-[10px] px-1.5 py-0 ${mastery.className}`}
+            {mastery && subtopic && (
+              <Select
+                value={subtopic.mastery_level}
+                onValueChange={(v) => {
+                  if (v) {
+                    api.patch(`/topics/${topicId}/subtopics/${subtopicId}/stats`, {
+                      mastery_level: v,
+                    }).then(() => fetchSubTopics(topicId));
+                  }
+                }}
               >
-                {mastery.label}
-              </Badge>
+                <SelectTrigger className={`h-7 w-[130px] text-xs font-medium rounded-md ${mastery.className}`}>
+                  <span>{mastery.label}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  {masteryOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-2 py-0.5 ${opt.className}`}
+                      >
+                        {opt.label}
+                      </Badge>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
 
@@ -355,14 +379,6 @@ function SubtopicDetailContent() {
               <StatsPanel
                 topicId={topicId}
                 subtopicId={subtopicId}
-                subtopic={subtopic}
-                questionCount={questionTotal}
-                totalMistakes={subtopic.mistake_count}
-                resolvedMistakes={0}
-                unresolvedMistakes={subtopic.mistake_count}
-                onRecordRevision={() => recordRevision(topicId, subtopicId)}
-                onUpdateMastery={(level) => updateMastery(topicId, subtopicId, level)}
-                onUpdateConfidence={(level) => updateConfidence(topicId, subtopicId, level)}
               />
             )}
 
@@ -522,60 +538,37 @@ function SubtopicDetailContent() {
 interface StatsPanelProps {
   topicId: string;
   subtopicId: string;
-  subtopic: {
-    revision_count: number;
-    last_revised_at: string | null;
-    mastery_level: MasteryLevel;
-    confidence_level: number;
-    questions_solved: number;
-    questions_correct: number;
-    mistake_count: number;
-    created_at: string;
-    updated_at: string;
-  };
-  questionCount: number;
-  totalMistakes: number;
-  resolvedMistakes: number;
-  unresolvedMistakes: number;
-  onRecordRevision: () => Promise<void>;
-  onUpdateMastery: (level: MasteryLevel) => Promise<void>;
-  onUpdateConfidence: (level: number) => Promise<void>;
 }
 
-function StatsPanel({
-  subtopic,
-  questionCount,
-  totalMistakes,
-  resolvedMistakes,
-  unresolvedMistakes,
-  onRecordRevision,
-  onUpdateMastery,
-  onUpdateConfidence,
-}: StatsPanelProps) {
+function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
+  const [stats, setStats] = useState<import("@/types").SubtopicStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState(0);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const [confidence, setConfidence] = useState(
-    Math.round(subtopic.confidence_level * 100)
-  );
+  const fetchStats = useCallback(async () => {
+    setLoadingStats(true);
+    try {
+      const res = await api.get(`/topics/${topicId}/subtopics/${subtopicId}/stats`);
+      setStats(res.data);
+      setConfidence(Math.round(res.data.confidence_level * 100));
+    } catch {
+      // ignore
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [topicId, subtopicId]);
 
   useEffect(() => {
-    setConfidence(Math.round(subtopic.confidence_level * 100));
-  }, [subtopic.confidence_level]);
+    if (sheetOpen) fetchStats();
+  }, [sheetOpen, fetchStats]);
 
   const handleRevision = async () => {
     setSaving("revision");
     try {
-      await onRecordRevision();
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const handleMasteryChange = async (value: string | null) => {
-    if (!value) return;
-    setSaving("mastery");
-    try {
-      await onUpdateMastery(value as MasteryLevel);
+      const res = await api.post(`/topics/${topicId}/subtopics/${subtopicId}/stats/revise`);
+      setStats(res.data);
     } finally {
       setSaving(null);
     }
@@ -584,17 +577,19 @@ function StatsPanel({
   const handleConfidenceSave = async () => {
     setSaving("confidence");
     try {
-      await onUpdateConfidence(Math.min(100, Math.max(0, confidence)) / 100);
+      const res = await api.patch(`/topics/${topicId}/subtopics/${subtopicId}/stats`, {
+        confidence_level: Math.min(100, Math.max(0, confidence)) / 100,
+      });
+      setStats(res.data);
     } finally {
       setSaving(null);
     }
   };
 
-  const confDirty =
-    confidence !== Math.round(subtopic.confidence_level * 100);
+  const confDirty = stats ? confidence !== Math.round(stats.confidence_level * 100) : false;
 
   return (
-    <Sheet>
+    <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
       <SheetTrigger
         render={
           <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
@@ -611,149 +606,135 @@ function StatsPanel({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-5">
-          {/* Mastery Level */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Mastery Level</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {masteryOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => handleMasteryChange(opt.value)}
-                  disabled={saving === "mastery"}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all ${
-                    subtopic.mastery_level === opt.value
-                      ? `${opt.className} border-current ring-1 ring-current/20`
-                      : "border-border text-muted-foreground hover:border-foreground/20"
-                  } disabled:opacity-50`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+        {loadingStats || !stats ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            Loading stats...
           </div>
+        ) : (
+          <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-5">
+            {/* Revision */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Revisions</Label>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <div className="text-2xl font-bold">{stats.revision_count}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {stats.last_revised_at
+                      ? `Last: ${new Date(stats.last_revised_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+                      : "Never revised"}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleRevision}
+                  disabled={saving === "revision"}
+                  className="gap-1.5"
+                >
+                  {saving === "revision" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  )}
+                  Revise
+                </Button>
+              </div>
+            </div>
 
-          {/* Revision */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Revisions</Label>
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <div className="text-2xl font-bold">{subtopic.revision_count}</div>
-                <div className="text-xs text-muted-foreground">
-                  {subtopic.last_revised_at
-                    ? `Last: ${new Date(subtopic.last_revised_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
-                    : "Never revised"}
+            {/* Confidence */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Confidence</Label>
+              <div className="flex items-center gap-3">
+                <Progress value={confidence} className="h-2 flex-1" />
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={confidence}
+                    onChange={(e) => setConfidence(Number(e.target.value))}
+                    className="h-8 w-16 text-xs text-center"
+                  />
+                  <span className="text-xs text-muted-foreground">%</span>
                 </div>
               </div>
-              <Button
-                size="sm"
-                onClick={handleRevision}
-                disabled={saving === "revision"}
-                className="gap-1.5"
-              >
-                {saving === "revision" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RotateCcw className="h-3.5 w-3.5" />
-                )}
-                Revise
-              </Button>
+              {confDirty && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={handleConfidenceSave}
+                  disabled={saving === "confidence"}
+                >
+                  {saving === "confidence" && (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  )}
+                  Save Confidence
+                </Button>
+              )}
             </div>
-          </div>
 
-          {/* Confidence */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Confidence</Label>
-            <div className="flex items-center gap-3">
-              <Progress value={confidence} className="h-2 flex-1" />
-              <div className="flex items-center gap-1">
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={confidence}
-                  onChange={(e) => setConfidence(Number(e.target.value))}
-                  className="h-8 w-16 text-xs text-center"
-                />
-                <span className="text-xs text-muted-foreground">%</span>
+            {/* Content */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Content</Label>
+              <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+                <span className="text-sm">Questions</span>
+                <span className="text-sm font-medium tabular-nums">{stats.question_count}</span>
               </div>
             </div>
-            {confDirty && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full text-xs"
-                onClick={handleConfidenceSave}
-                disabled={saving === "confidence"}
-              >
-                {saving === "confidence" && (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                )}
-                Save Confidence
-              </Button>
-            )}
-          </div>
 
-          {/* Content */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Content</Label>
-            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
-              <span className="text-sm">Questions</span>
-              <span className="text-sm font-medium tabular-nums">{questionCount}</span>
-            </div>
-          </div>
-
-          {/* Mistakes */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Mistakes</Label>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg border p-3 text-center">
-                <div className="text-xl font-bold">{totalMistakes}</div>
-                <div className="text-[10px] text-muted-foreground">Total</div>
+            {/* Mistakes */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Mistakes</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg border p-3 text-center">
+                  <div className="text-xl font-bold">{stats.total_mistakes}</div>
+                  <div className="text-[10px] text-muted-foreground">Total</div>
+                </div>
+                <div className="rounded-lg border p-3 text-center">
+                  <div className="text-xl font-bold text-red-500">{stats.unresolved_mistakes}</div>
+                  <div className="text-[10px] text-muted-foreground">Unresolved</div>
+                </div>
+                <div className="rounded-lg border p-3 text-center">
+                  <div className="text-xl font-bold text-green-500">{stats.resolved_mistakes}</div>
+                  <div className="text-[10px] text-muted-foreground">Resolved</div>
+                </div>
               </div>
-              <div className="rounded-lg border p-3 text-center">
-                <div className="text-xl font-bold text-red-500">{unresolvedMistakes}</div>
-                <div className="text-[10px] text-muted-foreground">Unresolved</div>
-              </div>
-              <div className="rounded-lg border p-3 text-center">
-                <div className="text-xl font-bold text-green-500">{resolvedMistakes}</div>
-                <div className="text-[10px] text-muted-foreground">Resolved</div>
-              </div>
-            </div>
-            {totalMistakes > 0 && (
-              <div className="flex items-center gap-2">
-                <Progress
-                  value={Math.round((resolvedMistakes / totalMistakes) * 100)}
-                  className="h-1.5 flex-1"
-                />
-                <span className="text-[10px] text-muted-foreground tabular-nums">
-                  {Math.round((resolvedMistakes / totalMistakes) * 100)}% resolved
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Timestamps */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Timeline</Label>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Created</span>
-                <span className="tabular-nums">{new Date(subtopic.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Last updated</span>
-                <span className="tabular-nums">{new Date(subtopic.updated_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
-              </div>
-              {subtopic.last_revised_at && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Last revised</span>
-                  <span className="tabular-nums">{new Date(subtopic.last_revised_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+              {stats.total_mistakes > 0 && (
+                <div className="flex items-center gap-2">
+                  <Progress
+                    value={Math.round((stats.resolved_mistakes / stats.total_mistakes) * 100)}
+                    className="h-1.5 flex-1"
+                  />
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                    {Math.round((stats.resolved_mistakes / stats.total_mistakes) * 100)}% resolved
+                  </span>
                 </div>
               )}
             </div>
+
+            {/* Timestamps */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Timeline</Label>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Created</span>
+                  <span className="tabular-nums">{new Date(stats.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Last updated</span>
+                  <span className="tabular-nums">{new Date(stats.updated_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+                </div>
+                {stats.last_revised_at && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Last revised</span>
+                    <span className="tabular-nums">{new Date(stats.last_revised_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </SheetContent>
     </Sheet>
   );

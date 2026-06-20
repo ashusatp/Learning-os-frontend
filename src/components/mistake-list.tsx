@@ -14,6 +14,8 @@ import {
   Loader2,
   AlertTriangle,
   LinkIcon,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -290,6 +292,8 @@ function MistakeCard({
   resolving: boolean;
   readOnly?: boolean;
 }) {
+  const [showCorrection, setShowCorrection] = useState(false);
+
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       {/* Header */}
@@ -354,8 +358,8 @@ function MistakeCard({
             />
           </div>
 
-          {/* Correction */}
-          {m.correction_html && (
+          {/* Correction — toggled */}
+          {m.correction_html && showCorrection && (
             <div>
               <span className="text-xs font-medium text-muted-foreground">Correct approach</span>
               <div
@@ -374,22 +378,35 @@ function MistakeCard({
 
           {/* Actions */}
           <div className="flex items-center gap-2 pt-2 border-t">
-            <Button
-              variant={m.is_resolved ? "secondary" : "outline"}
-              size="xs"
-              onClick={onResolve}
-              disabled={resolving}
-              className="gap-1 text-xs"
-            >
-              {resolving ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : m.is_resolved ? (
-                <Circle className="h-3 w-3" />
-              ) : (
-                <CheckCircle2 className="h-3 w-3" />
-              )}
-              {m.is_resolved ? "Unresolve" : "Resolve"}
-            </Button>
+            {m.correction_html && (
+              <Button
+                variant={showCorrection ? "secondary" : "outline"}
+                size="xs"
+                onClick={() => setShowCorrection(!showCorrection)}
+                className="gap-1 text-xs"
+              >
+                {showCorrection ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                {showCorrection ? "Hide Correction" : "Show Correction"}
+              </Button>
+            )}
+            {!readOnly && (
+              <Button
+                variant={m.is_resolved ? "secondary" : "outline"}
+                size="xs"
+                onClick={onResolve}
+                disabled={resolving}
+                className="gap-1 text-xs"
+              >
+                {resolving ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : m.is_resolved ? (
+                  <Circle className="h-3 w-3" />
+                ) : (
+                  <CheckCircle2 className="h-3 w-3" />
+                )}
+                {m.is_resolved ? "Unresolve" : "Resolve"}
+              </Button>
+            )}
 
             {!readOnly && <div className="flex-1" />}
 

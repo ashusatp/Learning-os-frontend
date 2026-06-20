@@ -123,6 +123,19 @@ export interface Mistake {
   updated_at: string;
 }
 
+export interface SubtopicStats {
+  mastery_level: MasteryLevel;
+  confidence_level: number;
+  revision_count: number;
+  last_revised_at: string | null;
+  question_count: number;
+  total_mistakes: number;
+  unresolved_mistakes: number;
+  resolved_mistakes: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;
