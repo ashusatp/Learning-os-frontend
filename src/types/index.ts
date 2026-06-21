@@ -182,10 +182,105 @@ export interface SubTopic {
   questions_solved: number;
   questions_correct: number;
   mistake_count: number;
+  exam_frequency: number;
+  marks_per_question: number;
   notes_html: string | null;
   sketch_data_url: string | null;
   whiteboard_data_url: string | null;
   files: SubtopicFile[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Revision Engine ──
+
+export type QualityRating = "AGAIN" | "HARD" | "GOOD" | "EASY";
+export type RevisionEventType = "COMPLETED" | "MISSED" | "SKIPPED" | "RESCHEDULED";
+
+export interface RevisionSchedule {
+  id: string;
+  subtopic_id: string;
+  next_revision_at: string;
+  current_interval_days: number;
+  ease_factor: number;
+  consecutive_successes: number;
+  consecutive_misses: number;
+  total_revisions: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RevisionLog {
+  id: string;
+  subtopic_id: string;
+  schedule_id: string;
+  event_type: RevisionEventType;
+  quality_rating: QualityRating | null;
+  scheduled_for: string;
+  completed_at: string | null;
+  was_on_time: boolean;
+  interval_used_days: number;
+  next_interval_days: number | null;
+  ease_before: number;
+  ease_after: number | null;
+  revision_notes: string | null;
+  created_at: string;
+}
+
+export interface RevisionQueueItem {
+  schedule_id: string;
+  subtopic_id: string;
+  subtopic_name: string;
+  topic_name: string;
+  subject_name: string;
+  mastery_level: MasteryLevel;
+  mistake_count: number;
+  exam_frequency: number;
+  marks_per_question: number;
+  next_revision_at: string;
+  current_interval_days: number;
+  ease_factor: number;
+  consecutive_successes: number;
+  days_overdue: number;
+  priority_score: number;
+  status: "overdue" | "due_today" | "upcoming";
+}
+
+export interface RevisionStats {
+  due_today: number;
+  overdue_count: number;
+  completed_today: number;
+  daily_streak: number;
+  longest_streak: number;
+  completion_rate_7d: number;
+  completion_rate_30d: number;
+}
+
+export interface RevisionQueueResponse {
+  overdue: RevisionQueueItem[];
+  due_today: RevisionQueueItem[];
+  upcoming: RevisionQueueItem[];
+  stats: RevisionStats;
+}
+
+export interface RevisionCompleteResponse {
+  schedule: RevisionSchedule;
+  log: RevisionLog;
+  next_interval_days: number;
+  new_ease_factor: number;
+  next_revision_at: string;
+}
+
+export interface UserRevisionSettings {
+  id: string;
+  user_id: string;
+  daily_limit: number;
+  vacation_until: string | null;
+  streak_freezes_remaining: number;
+  daily_streak: number;
+  longest_streak: number;
+  catch_up_days: number;
   created_at: string;
   updated_at: string;
 }

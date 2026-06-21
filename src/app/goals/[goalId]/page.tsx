@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 import { useParams } from "next/navigation";
-import { BookMarked } from "lucide-react";
+import Link from "next/link";
+import { BookMarked, CalendarCheck } from "lucide-react";
 import { Header, BreadcrumbEntry } from "@/components/header";
+import { Button } from "@/components/ui/button";
 import { SubjectCard } from "@/components/subject-card";
 import { CreateDialog, FieldConfig } from "@/components/create-dialog";
 import { SubjectListSkeleton } from "@/components/page-skeleton";
@@ -87,6 +89,12 @@ function GoalDetailContent() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Link href={`/goals/${goalId}/revisions`}>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <CalendarCheck className="h-4 w-4" />
+                Revisions
+              </Button>
+            </Link>
             <LogMistakeDialog goalId={goalId} goalTitle={activeGoal?.title} />
             <CreateDialog
               title="Subject"

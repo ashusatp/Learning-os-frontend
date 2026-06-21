@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Maximize2,
   Minimize2,
+  CalendarCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -55,7 +56,7 @@ import { useSubTopicStore } from "@/stores/subtopic-store";
 import { useQuestionStore } from "@/stores/question-store";
 import { useMistakeStore } from "@/stores/mistake-store";
 import api from "@/lib/api";
-import { MasteryLevel } from "@/types";
+import { MasteryLevel, RevisionSchedule } from "@/types";
 
 type Mode = "view" | "edit";
 type Tab = "notes" | "sketchboard" | "whiteboard" | "files" | "questions" | "mistakes";
@@ -581,6 +582,7 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
   const [saving, setSaving] = useState<string | null>(null);
   const [confidence, setConfidence] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [revSchedule, setRevSchedule] = useState<RevisionSchedule | null>(null);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -590,14 +592,29 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
       setConfidence(Math.round(res.data.confidence_level * 100));
     } catch {
       // ignore
-    } finally {
-      setLoadingStats(false);
     }
+    try {
+      const schedRes = await api.get(`/subtopics/${subtopicId}/revision-schedule`);
+      setRevSchedule(schedRes.data);
+    } catch {
+      setRevSchedule(null);
+    }
+    setLoadingStats(false);
   }, [topicId, subtopicId]);
 
   useEffect(() => {
     if (sheetOpen) fetchStats();
   }, [sheetOpen, fetchStats]);
+
+  const handleCreateSchedule = async () => {
+    setSaving("schedule");
+    try {
+      const res = await api.post(`/subtopics/${subtopicId}/revision-schedule`);
+      setRevSchedule(res.data);
+    } finally {
+      setSaving(null);
+    }
+  };
 
   const handleRevision = async () => {
     setSaving("revision");
@@ -703,6 +720,61 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
                   Revise
                 </Button>
               </div>
+            </div>
+
+            {/* Revision Schedule */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Revision Schedule</Label>
+              {revSchedule ? (
+                <div className="rounded-lg border p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Next revision</span>
+                    <span className="text-xs font-medium">
+                      {new Date(revSchedule.next_revision_at).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Interval</span>
+                    <span className="text-xs font-medium">{revSchedule.current_interval_days} days</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Streak</span>
+                    <span className="text-xs font-medium">{revSchedule.consecutive_successes}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Status</span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] px-1.5 py-0 ${
+                        revSchedule.is_active
+                          ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
+                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      {revSchedule.is_active ? "Active" : "Paused"}
+                    </Badge>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1.5 text-xs"
+                  onClick={handleCreateSchedule}
+                  disabled={saving === "schedule"}
+                >
+                  {saving === "schedule" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CalendarCheck className="h-3.5 w-3.5" />
+                  )}
+                  Add to Revision Queue
+                </Button>
+              )}
             </div>
 
             {/* Confidence */}
