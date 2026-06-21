@@ -231,6 +231,10 @@ export interface RevisionLog {
 export interface RevisionQueueItem {
   schedule_id: string;
   subtopic_id: string;
+  topic_id: string;
+  subject_id: string;
+  goal_id: string;
+  goal_title: string;
   subtopic_name: string;
   topic_name: string;
   subject_name: string;
@@ -264,12 +268,31 @@ export interface RevisionQueueResponse {
   stats: RevisionStats;
 }
 
+export interface PromotionSuggestion {
+  subtopic_id: string;
+  subtopic_name: string;
+  current_level: string;
+  suggested_level: string;
+  consecutive_successes: number;
+}
+
+export interface PenaltyApplied {
+  days_overdue: number;
+  confidence_penalty: number;
+  mastery_dropped: number;
+  old_mastery: string;
+  new_mastery: string | null;
+  interval_multiplier: number;
+}
+
 export interface RevisionCompleteResponse {
   schedule: RevisionSchedule;
   log: RevisionLog;
   next_interval_days: number;
   new_ease_factor: number;
   next_revision_at: string;
+  promotion_suggestion: PromotionSuggestion | null;
+  penalty_applied: PenaltyApplied | null;
 }
 
 export interface UserRevisionSettings {

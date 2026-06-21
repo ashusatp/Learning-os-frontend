@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   Calendar,
   Clock,
@@ -9,8 +9,8 @@ import {
   CheckCircle2,
   Flame,
   TrendingUp,
-  Pause,
-  Play,
+  ArrowUpCircle,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +18,8 @@ import { Header, BreadcrumbEntry } from "@/components/header";
 import { RevisionCard } from "@/components/revision-card";
 import { useRevisionStore } from "@/stores/revision-store";
 import { useGoalStore } from "@/stores/goal-store";
-import { QualityRating } from "@/types";
+import { PromotionSuggestion, QualityRating } from "@/types";
+import { toast } from "sonner";
 
 export default function RevisionDashboardPage() {
   const params = useParams();
@@ -39,6 +40,8 @@ export default function RevisionDashboardPage() {
   } = useRevisionStore();
 
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [promotionPending, setPromotionPending] = useState<PromotionSuggestion | null>(null);
+  const { promoteMastery } = useRevisionStore();
 
   useEffect(() => {
     const goal = goals.find((g) => g.id === goalId);
@@ -53,13 +56,46 @@ export default function RevisionDashboardPage() {
     async (scheduleId: string, rating: QualityRating) => {
       setCompletingId(scheduleId);
       try {
-        await completeRevision(scheduleId, rating);
+        const result = await completeRevision(scheduleId, rating);
+
+        // Show penalty notification
+        if (result.penalty_applied && result.penalty_applied.mastery_dropped > 0) {
+          toast.error(
+            `Mastery decayed: ${result.penalty_applied.old_mastery} → ${result.penalty_applied.new_mastery} (${result.penalty_applied.days_overdue}d overdue)`,
+          );
+        } else if (result.penalty_applied && result.penalty_applied.confidence_penalty > 0) {
+          toast.warning(
+            `Confidence reduced by ${result.penalty_applied.confidence_penalty}% (${result.penalty_applied.days_overdue}d overdue)`,
+          );
+        }
+
+        // Show promotion suggestion
+        if (result.promotion_suggestion) {
+          setPromotionPending(result.promotion_suggestion);
+        }
       } finally {
         setCompletingId(null);
       }
     },
     [completeRevision]
   );
+
+  const handleAcceptPromotion = useCallback(async () => {
+    if (!promotionPending) return;
+    try {
+      await promoteMastery(promotionPending.subtopic_id, promotionPending.suggested_level);
+      toast.success(
+        `${promotionPending.subtopic_name} promoted to ${promotionPending.suggested_level}!`,
+      );
+    } catch {
+      toast.error("Failed to promote mastery");
+    }
+    setPromotionPending(null);
+  }, [promotionPending, promoteMastery]);
+
+  const handleDismissPromotion = useCallback(() => {
+    setPromotionPending(null);
+  }, []);
 
   const handleSkip = useCallback(
     async (scheduleId: string) => {
@@ -119,6 +155,48 @@ export default function RevisionDashboardPage() {
               label="Streak"
               value={`${stats.daily_streak}d`}
             />
+          </div>
+        )}
+
+        {/* Promotion suggestion banner */}
+        {promotionPending && (
+          <div className="mb-6 rounded-lg border border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <ArrowUpCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">
+                  Promote {promotionPending.subtopic_name}?
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {promotionPending.consecutive_successes} successful revisions in a row!
+                  Promote from {promotionPending.current_level} to {promotionPending.suggested_level}?
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button size="sm" variant="outline" onClick={handleDismissPromotion}>
+                  Dismiss
+                </Button>
+                <Button size="sm" onClick={handleAcceptPromotion} className="bg-green-600 hover:bg-green-700 text-white">
+                  Promote
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Welcome back catch-up banner */}
+        {!loading && overdue.length > 5 && (
+          <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Welcome back!</p>
+                <p className="text-xs text-muted-foreground">
+                  You have {overdue.length} overdue items. Focus on the highest-priority ones first
+                  — they&apos;re sorted by importance. No need to do them all at once.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -258,7 +336,7 @@ function QueueSection({
   icon: React.ReactNode;
   count: number;
   items: import("@/types").RevisionQueueItem[];
-  goalId: string;
+  goalId?: string;
   completingId: string | null;
   onComplete: (id: string, r: QualityRating) => Promise<void>;
   onSkip: (id: string) => Promise<void>;

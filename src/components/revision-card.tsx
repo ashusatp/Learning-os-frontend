@@ -40,7 +40,7 @@ interface RevisionCardProps {
   onComplete: (scheduleId: string, rating: QualityRating) => Promise<void>;
   onSkip: (scheduleId: string) => Promise<void>;
   onPause: (scheduleId: string) => Promise<void>;
-  goalId: string;
+  goalId?: string;
   completing?: boolean;
 }
 
@@ -52,6 +52,7 @@ export function RevisionCard({
   goalId,
   completing,
 }: RevisionCardProps) {
+  const resolvedGoalId = goalId || item.goal_id;
   const [expanded, setExpanded] = useState(false);
 
   const weightage = item.exam_frequency * item.marks_per_question;
@@ -70,7 +71,7 @@ export function RevisionCard({
             {item.subtopic_name}
           </span>
           <span className="text-[11px] text-muted-foreground">
-            {item.subject_name} &rsaquo; {item.topic_name}
+            {item.goal_title && <>{item.goal_title} &rsaquo; </>}{item.subject_name} &rsaquo; {item.topic_name}
           </span>
         </div>
 
@@ -186,7 +187,7 @@ export function RevisionCard({
             </Button>
             <div className="flex-1" />
             <a
-              href={`/goals/${goalId}/subjects/_/topics/_/subtopics/${item.subtopic_id}`}
+              href={`/goals/${resolvedGoalId}/subjects/${item.subject_id}/topics/${item.topic_id}/subtopics/${item.subtopic_id}`}
               target="_blank"
               rel="noopener"
             >

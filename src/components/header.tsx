@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, LogOut, Sun, Moon } from "lucide-react";
+import { BookOpen, LogOut, Sun, Moon, RotateCcw } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
   DropdownMenu,
@@ -58,6 +58,14 @@ export function Header({ breadcrumbs }: HeaderProps) {
           <Link href="/" className="flex items-center gap-2 text-primary">
             <BookOpen className="h-5 w-5" />
             <span className="text-lg font-bold tracking-tight">Learning OS</span>
+          </Link>
+
+          <Link
+            href="/revisions"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <RotateCcw className="h-4 w-4" />
+            <span className="hidden sm:inline">Revisions</span>
           </Link>
 
           {breadcrumbs && breadcrumbs.length > 0 && (

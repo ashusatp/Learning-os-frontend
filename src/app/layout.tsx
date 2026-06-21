@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Source_Sans_3 } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ReportIssue } from "@/components/report-issue";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const sourceSans = Source_Sans_3({
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans">
         <ThemeProvider>
           {children}
+          <Toaster richColors position="top-right" />
           <ReportIssue />
         </ThemeProvider>
       </body>

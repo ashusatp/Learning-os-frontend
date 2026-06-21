@@ -24,6 +24,7 @@ interface RevisionState {
 
   // Actions
   fetchQueue: (goalId: string) => Promise<void>;
+  fetchGlobalQueue: () => Promise<void>;
   fetchStats: (goalId: string) => Promise<void>;
   completeRevision: (
     scheduleId: string,
@@ -37,6 +38,7 @@ interface RevisionState {
   createSchedule: (subtopicId: string) => Promise<RevisionSchedule>;
   fetchSettings: () => Promise<void>;
   updateSettings: (data: Partial<Pick<UserRevisionSettings, "daily_limit" | "vacation_until" | "catch_up_days">>) => Promise<void>;
+  promoteMastery: (subtopicId: string, newLevel: string) => Promise<void>;
 }
 
 export const useRevisionStore = create<RevisionState>((set, get) => ({
@@ -54,6 +56,25 @@ export const useRevisionStore = create<RevisionState>((set, get) => ({
       const res = await api.get<RevisionQueueResponse>(
         `/goals/${goalId}/revisions/queue`
       );
+      set({
+        overdue: res.data.overdue,
+        dueToday: res.data.due_today,
+        upcoming: res.data.upcoming,
+        stats: res.data.stats,
+        loading: false,
+      });
+    } catch (err: any) {
+      set({
+        error: err.response?.data?.message || "Failed to load revision queue",
+        loading: false,
+      });
+    }
+  },
+
+  fetchGlobalQueue: async () => {
+    set({ loading: true, error: null });
+    try {
+      const res = await api.get<RevisionQueueResponse>("/revisions/queue");
       set({
         overdue: res.data.overdue,
         dueToday: res.data.due_today,
@@ -150,5 +171,9 @@ export const useRevisionStore = create<RevisionState>((set, get) => ({
       data
     );
     set({ settings: res.data });
+  },
+
+  promoteMastery: async (subtopicId: string, newLevel: string) => {
+    await api.post(`/subtopics/${subtopicId}/promote-mastery?new_level=${newLevel}`);
   },
 }));
