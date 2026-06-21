@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Sparkles, MessageSquare, BookOpen, Lightbulb, CheckCircle } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 export interface SlashCommand {
   id: string;
@@ -17,40 +17,17 @@ const AI_COMMANDS: SlashCommand[] = [
     description: "Ask AI to help write your notes",
     icon: <Sparkles className="h-4 w-4 text-violet-500" />,
   },
-  {
-    id: "ai-explain",
-    label: "Explain",
-    description: "Explain a concept in detail",
-    icon: <BookOpen className="h-4 w-4 text-blue-500" />,
-  },
-  {
-    id: "ai-example",
-    label: "Give Examples",
-    description: "Generate examples for a topic",
-    icon: <Lightbulb className="h-4 w-4 text-amber-500" />,
-  },
-  {
-    id: "ai-summarize",
-    label: "Summarize",
-    description: "Summarize content concisely",
-    icon: <CheckCircle className="h-4 w-4 text-emerald-500" />,
-  },
-  {
-    id: "ai-ask",
-    label: "Ask Anything",
-    description: "Open chat to ask AI anything",
-    icon: <MessageSquare className="h-4 w-4 text-cyan-500" />,
-  },
 ];
 
 interface AISlashDropdownProps {
   query: string; // text after "/ai" e.g. "" or "-he" or "-help"
   coords: { top: number; left: number };
+  direction?: "down" | "up";
   onSelect: (command: SlashCommand) => void;
   onClose: () => void;
 }
 
-export function AISlashDropdown({ query, coords, onSelect, onClose }: AISlashDropdownProps) {
+export function AISlashDropdown({ query, coords, direction = "down", onSelect, onClose }: AISlashDropdownProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +79,11 @@ export function AISlashDropdown({ query, coords, onSelect, onClose }: AISlashDro
     <div
       ref={containerRef}
       className="fixed z-[100] bg-popover border border-border rounded-xl shadow-xl py-1.5 min-w-[260px] max-w-[300px] animate-in fade-in-0 zoom-in-95 duration-100"
-      style={{ top: coords.top, left: coords.left }}
+      style={
+        direction === "up"
+          ? { bottom: window.innerHeight - coords.top, left: coords.left }
+          : { top: coords.top, left: coords.left }
+      }
     >
       <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         AI Commands

@@ -663,6 +663,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       query: string;
       coords: { top: number; left: number };
       triggerStart: number;
+      direction: "down" | "up";
     } | null>(null);
 
     const closePop = useCallback(() => setPop(null), []);
@@ -674,9 +675,10 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     // Refs for ProseMirror plugin (stable across renders)
     const aiEnabledRef = useRef(aiEnabled);
     aiEnabledRef.current = aiEnabled;
+    const openAIChatRef = useRef<(pos: number, prompt?: string, selected?: string) => void>(() => {});
 
     const slashCallbackRef = useRef<{
-      onSlashUpdate: (query: string, coords: { top: number; left: number }, triggerStart: number) => void;
+      onSlashUpdate: (query: string, coords: { top: number; left: number }, triggerStart: number, direction: "down" | "up") => void;
       onSlashClose: () => void;
     }>({
       onSlashUpdate: () => {},
@@ -684,18 +686,19 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     });
 
     slashCallbackRef.current.onSlashUpdate = useCallback(
-      (query: string, coords: { top: number; left: number }, triggerStart: number) => {
+      (query: string, coords: { top: number; left: number }, triggerStart: number, direction: "down" | "up") => {
         setSlashDropdown((prev) => {
           if (
             prev &&
             prev.query === query &&
             prev.triggerStart === triggerStart &&
+            prev.direction === direction &&
             Math.abs(prev.coords.top - coords.top) < 1 &&
             Math.abs(prev.coords.left - coords.left) < 1
           ) {
             return prev; // no change, prevent re-render
           }
-          return { query, coords, triggerStart };
+          return { query, coords, triggerStart, direction };
         });
       },
       [],
@@ -727,6 +730,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       setAiChatCoords(getAIChatCoords(pos));
       setShowAIHelp(true);
     }, [getAIChatCoords]);
+    openAIChatRef.current = openAIChat;
 
     // Handle slash command selection
     const handleSlashCommandSelect = useCallback(
@@ -744,10 +748,6 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         const pos = slashDropdown.triggerStart;
         const promptMap: Record<string, string | undefined> = {
           "ai-help": undefined,
-          "ai-ask": undefined,
-          "ai-explain": "Explain this topic in detail with clear definitions and key points.",
-          "ai-example": "Provide detailed examples with explanations for this topic.",
-          "ai-summarize": "Summarize the current notes concisely with key points, formulas, and important definitions.",
         };
         openAIChat(pos, promptMap[cmd.id]);
       },
@@ -782,12 +782,33 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         addProseMirrorPlugins() {
           const enabledRef = aiEnabledRef;
           const cbRef = slashCallbackRef;
+          const aiChatRef = openAIChatRef;
           return [
             new Plugin({
               key: new PluginKey("aiSlashDetector"),
               props: {
                 handleKeyDown(view, event) {
                   if (!enabledRef.current) return false;
+
+                  // Cmd+J / Ctrl+J → open AI help
+                  if (event.key === "j" && (event.metaKey || event.ctrlKey)) {
+                    event.preventDefault();
+                    const { state } = view;
+                    const { from, to } = state.selection;
+                    if (from !== to) {
+                      // Text is selected — pass as context
+                      const text = state.doc.textBetween(from, to, " ");
+                      const slice = state.doc.slice(from, to);
+                      const tempDiv = document.createElement("div");
+                      const serializer = DOMSerializer.fromSchema(state.schema);
+                      const fragment = serializer.serializeFragment(slice.content);
+                      tempDiv.appendChild(fragment);
+                      aiChatRef.current(to, undefined, tempDiv.innerHTML || text);
+                    } else {
+                      aiChatRef.current(from);
+                    }
+                    return true;
+                  }
 
                   // Close dropdown on Escape
                   if (event.key === "Escape") {
@@ -826,13 +847,19 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                     const editorRect = view.dom.getBoundingClientRect();
                     const triggerStart = $from.pos - match[0].length;
 
+                    // Show dropdown above if cursor is in the bottom 40% of viewport
+                    const viewportH = window.innerHeight;
+                    const nearBottom = coords.bottom > viewportH * 0.6;
+                    const direction = nearBottom ? "up" : "down";
+
                     cbRef.current.onSlashUpdate(
                       match[1] || "", // query after "/ai"
                       {
-                        top: coords.bottom + 4,
+                        top: nearBottom ? coords.top - 4 : coords.bottom + 4,
                         left: Math.max(coords.left, editorRect.left),
                       },
                       triggerStart,
+                      direction,
                     );
                   },
                 };
@@ -1300,21 +1327,43 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           {aiEnabled && (
             <>
               <TSep />
-              <TBtn
-                onClick={() => {
-                  if (showAIHelp) {
-                    setShowAIHelp(false);
-                    setAiChatCoords(null);
-                    editor.commands.focus();
-                  } else {
-                    openAIChat(editor.state.selection.from);
-                  }
-                }}
-                isActive={showAIHelp}
-                title="AI Help (/ai-help)"
-              >
-                <Sparkles className={I} />
-              </TBtn>
+              <div className="relative group/ai">
+                <TBtn
+                  onClick={() => {
+                    if (showAIHelp) {
+                      setShowAIHelp(false);
+                      setAiChatCoords(null);
+                      editor.commands.focus();
+                    } else {
+                      openAIChat(editor.state.selection.from);
+                    }
+                  }}
+                  isActive={showAIHelp}
+                  title=""
+                >
+                  <Sparkles className={I} />
+                </TBtn>
+                {/* Rich tooltip */}
+                <div className="absolute right-0 top-full mt-1.5 hidden group-hover/ai:block z-50 pointer-events-none">
+                  <div className="bg-popover border border-border rounded-xl shadow-xl px-4 py-3 w-[220px] text-left">
+                    <p className="text-xs font-semibold text-foreground mb-2">AI Help</p>
+                    <div className="space-y-1.5 text-[11px] text-muted-foreground">
+                      <div className="flex items-center justify-between">
+                        <span>Keyboard shortcut</span>
+                        <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">{typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent) ? "⌘J" : "Ctrl+J"}</kbd>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Slash command</span>
+                        <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">/ai</kbd>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Selected text</span>
+                        <span className="text-[10px]">Select → {typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent) ? "⌘J" : "Ctrl+J"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -1392,7 +1441,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               <div className="w-px h-4 bg-border mx-0.5" />
               <TBtn
                 onClick={handleAskAISelection}
-                title="Ask AI about selection"
+                title={`Ask AI about selection (${typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent) ? "⌘" : "Ctrl+"}J)`}
               >
                 <Sparkles className={IB} />
               </TBtn>
@@ -1482,6 +1531,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             <AISlashDropdown
               query={slashDropdown.query}
               coords={slashDropdown.coords}
+              direction={slashDropdown.direction}
               onSelect={handleSlashCommandSelect}
               onClose={() => setSlashDropdown(null)}
             />
