@@ -162,7 +162,7 @@ function GlobalRevisionsContent() {
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
 
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-3xl">
+      <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
         {/* Title + Filter */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -196,193 +196,214 @@ function GlobalRevisionsContent() {
           )}
         </div>
 
-        {/* Stats bar */}
-        {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-            <StatCard
-              icon={<Clock className="h-4 w-4 text-violet-500" />}
-              label="Due Today"
-              value={stats.due_today}
-            />
-            <StatCard
-              icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
-              label="Overdue"
-              value={stats.overdue_count}
-              alert={stats.overdue_count > 0}
-            />
-            <StatCard
-              icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
-              label="Done Today"
-              value={stats.completed_today}
-            />
-            <StatCard
-              icon={<Flame className="h-4 w-4 text-orange-500" />}
-              label="Streak"
-              value={`${stats.daily_streak}d`}
-            />
-          </div>
-        )}
-
-        {/* Daily progress */}
-        {stats && stats.due_today > 0 && (
-          <div className="mb-6 rounded-lg border bg-card px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium">Today&apos;s Progress</span>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {stats.completed_today} / {settings?.daily_limit || stats.due_today} done
-              </span>
-            </div>
-            <Progress
-              value={Math.min(
-                100,
-                (stats.completed_today / (settings?.daily_limit || stats.due_today)) * 100
-              )}
-              className="h-2"
-            />
-          </div>
-        )}
-
-        {/* Calendar */}
-        <div className="mb-8">
-          <RevisionCalendar />
-        </div>
-
-        {/* Promotion suggestion banner */}
-        {promotionPending && (
-          <div className="mb-6 rounded-lg border border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <ArrowUpCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">
-                  Promote {promotionPending.subtopic_name}?
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {promotionPending.consecutive_successes} successful revisions in a row!
-                  Promote from {promotionPending.current_level} to{" "}
-                  {promotionPending.suggested_level}?
-                </p>
+        {/* Two-column layout: queue left, calendar right */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left column — stats + queue */}
+          <div className="flex-1 min-w-0">
+            {/* Stats bar */}
+            {stats && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                <StatCard
+                  icon={<Clock className="h-4 w-4 text-violet-500" />}
+                  label="Due Today"
+                  value={stats.due_today}
+                />
+                <StatCard
+                  icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
+                  label="Overdue"
+                  value={stats.overdue_count}
+                  alert={stats.overdue_count > 0}
+                />
+                <StatCard
+                  icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
+                  label="Done Today"
+                  value={stats.completed_today}
+                />
+                <StatCard
+                  icon={<Flame className="h-4 w-4 text-orange-500" />}
+                  label="Streak"
+                  value={`${stats.daily_streak}d`}
+                />
               </div>
-              <div className="flex gap-2 shrink-0">
-                <Button size="sm" variant="outline" onClick={handleDismissPromotion}>
-                  Dismiss
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleAcceptPromotion}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  Promote
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Welcome back catch-up banner */}
-        {!loading && filteredOverdue.length > 5 && (
-          <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Welcome back!</p>
-                <p className="text-xs text-muted-foreground">
-                  You have {filteredOverdue.length} overdue items. Focus on the
-                  highest-priority ones first — they&apos;re sorted by importance.
-                </p>
+            {/* Daily progress */}
+            {stats && stats.due_today > 0 && (
+              <div className="mb-6 rounded-lg border bg-card px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium">Today&apos;s Progress</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {stats.completed_today} / {settings?.daily_limit || stats.due_today} done
+                  </span>
+                </div>
+                <Progress
+                  value={Math.min(
+                    100,
+                    (stats.completed_today / (settings?.daily_limit || stats.due_today)) * 100
+                  )}
+                  className="h-2"
+                />
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Loading */}
-        {loading && (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-lg border bg-card px-4 py-3">
+            {/* Promotion suggestion banner */}
+            {promotionPending && (
+              <div className="mb-6 rounded-lg border border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <Skeleton className="h-4 flex-1" />
-                  <Skeleton className="h-4 w-20 rounded-full" />
+                  <ArrowUpCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">
+                      Promote {promotionPending.subtopic_name}?
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {promotionPending.consecutive_successes} successful revisions in a row!
+                      Promote from {promotionPending.current_level} to{" "}
+                      {promotionPending.suggested_level}?
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={handleDismissPromotion}>
+                      Dismiss
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleAcceptPromotion}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      Promote
+                    </Button>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="flex items-center justify-center py-16 text-destructive gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            {error}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {isEmpty && (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-              <CheckCircle2 className="h-8 w-8 text-green-500" />
-            </div>
-            <p className="text-lg font-medium">All caught up!</p>
-            <p className="text-sm text-muted-foreground max-w-sm">
-              No revisions due. Start studying subtopics and they&apos;ll appear
-              here when it&apos;s time to review.
-            </p>
-          </div>
-        )}
-
-        {/* Queue sections */}
-        {!loading && !error && !isEmpty && (
-          <div className="space-y-6">
-            {filteredOverdue.length > 0 && (
-              <QueueSection
-                title="Overdue"
-                icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
-                count={filteredOverdue.length}
-                items={filteredOverdue}
-                completingId={completingId}
-                onComplete={handleComplete}
-                onSkip={handleSkip}
-                onPause={handlePause}
-              />
             )}
 
-            {filteredDueToday.length > 0 && (
-              <QueueSection
-                title="Due Today"
-                icon={<Clock className="h-4 w-4 text-violet-500" />}
-                count={filteredDueToday.length}
-                items={filteredDueToday}
-                completingId={completingId}
-                onComplete={handleComplete}
-                onSkip={handleSkip}
-                onPause={handlePause}
-              />
-            )}
-
-            {filteredUpcoming.length > 0 && (
-              <QueueSection
-                title="Upcoming (next 3 days)"
-                icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-                count={filteredUpcoming.length}
-                items={filteredUpcoming}
-                completingId={completingId}
-                onComplete={handleComplete}
-                onSkip={handleSkip}
-                onPause={handlePause}
-              />
-            )}
-
-            {/* Completion rates */}
-            {stats &&
-              (stats.completion_rate_7d > 0 || stats.completion_rate_30d > 0) && (
-                <div className="flex items-center gap-4 pt-4 border-t text-xs text-muted-foreground">
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  <span>7-day completion: {stats.completion_rate_7d}%</span>
-                  <span>30-day completion: {stats.completion_rate_30d}%</span>
+            {/* Welcome back catch-up banner */}
+            {!loading && filteredOverdue.length > 5 && (
+              <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Welcome back!</p>
+                    <p className="text-xs text-muted-foreground">
+                      You have {filteredOverdue.length} overdue items. Focus on the
+                      highest-priority ones first — they&apos;re sorted by importance.
+                    </p>
+                  </div>
                 </div>
-              )}
+              </div>
+            )}
+
+            {/* Loading */}
+            {loading && (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-lg border bg-card px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-4 flex-1" />
+                      <Skeleton className="h-4 w-20 rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Error */}
+            {error && (
+              <div className="flex items-center justify-center py-16 text-destructive gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                {error}
+              </div>
+            )}
+
+            {/* Empty state */}
+            {isEmpty && (
+              <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                  <CheckCircle2 className="h-8 w-8 text-green-500" />
+                </div>
+                <p className="text-lg font-medium">All caught up!</p>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  No revisions due. Start studying subtopics and they&apos;ll appear
+                  here when it&apos;s time to review.
+                </p>
+              </div>
+            )}
+
+            {/* Queue sections */}
+            {!loading && !error && !isEmpty && (
+              <div className="space-y-6">
+                {filteredOverdue.length > 0 && (
+                  <QueueSection
+                    title="Overdue"
+                    icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
+                    count={filteredOverdue.length}
+                    items={filteredOverdue}
+                    completingId={completingId}
+                    onComplete={handleComplete}
+                    onSkip={handleSkip}
+                    onPause={handlePause}
+                  />
+                )}
+
+                {filteredDueToday.length > 0 && (
+                  <QueueSection
+                    title="Due Today"
+                    icon={<Clock className="h-4 w-4 text-violet-500" />}
+                    count={filteredDueToday.length}
+                    items={filteredDueToday}
+                    completingId={completingId}
+                    onComplete={handleComplete}
+                    onSkip={handleSkip}
+                    onPause={handlePause}
+                  />
+                )}
+
+                {filteredUpcoming.length > 0 && (
+                  <QueueSection
+                    title="Upcoming (next 3 days)"
+                    icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+                    count={filteredUpcoming.length}
+                    items={filteredUpcoming}
+                    completingId={completingId}
+                    onComplete={handleComplete}
+                    onSkip={handleSkip}
+                    onPause={handlePause}
+                  />
+                )}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Right column — calendar + completion rates (sticky) */}
+          <div className="w-full lg:w-[340px] shrink-0">
+            <div className="lg:sticky lg:top-8 space-y-4">
+              <RevisionCalendar />
+
+              {/* Completion rates */}
+              {stats &&
+                (stats.completion_rate_7d > 0 || stats.completion_rate_30d > 0) && (
+                  <div className="rounded-lg border bg-card px-4 py-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs font-medium">Completion Rates</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Last 7 days</span>
+                        <span className="text-xs font-medium">{stats.completion_rate_7d}%</span>
+                      </div>
+                      <Progress value={stats.completion_rate_7d} className="h-1.5" />
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-xs text-muted-foreground">Last 30 days</span>
+                        <span className="text-xs font-medium">{stats.completion_rate_30d}%</span>
+                      </div>
+                      <Progress value={stats.completion_rate_30d} className="h-1.5" />
+                    </div>
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );
