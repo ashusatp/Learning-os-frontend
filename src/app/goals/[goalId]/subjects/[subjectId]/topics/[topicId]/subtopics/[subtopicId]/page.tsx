@@ -583,6 +583,8 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
   const [confidence, setConfidence] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [revSchedule, setRevSchedule] = useState<RevisionSchedule | null>(null);
+  const [examFrequency, setExamFrequency] = useState(0);
+  const [marksPerQuestion, setMarksPerQuestion] = useState(0);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -590,6 +592,8 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
       const res = await api.get(`/topics/${topicId}/subtopics/${subtopicId}/stats`);
       setStats(res.data);
       setConfidence(Math.round(res.data.confidence_level * 100));
+      setExamFrequency(res.data.exam_frequency ?? 0);
+      setMarksPerQuestion(res.data.marks_per_question ?? 0);
     } catch {
       // ignore
     }
@@ -638,7 +642,24 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
     }
   };
 
+  const handleWeightageSave = async () => {
+    setSaving("weightage");
+    try {
+      const res = await api.patch(`/topics/${topicId}/subtopics/${subtopicId}/stats`, {
+        exam_frequency: Math.max(0, examFrequency),
+        marks_per_question: Math.max(0, marksPerQuestion),
+      });
+      setStats(res.data);
+    } finally {
+      setSaving(null);
+    }
+  };
+
   const confDirty = stats ? confidence !== Math.round(stats.confidence_level * 100) : false;
+  const weightageDirty = stats
+    ? examFrequency !== (stats.exam_frequency ?? 0) ||
+      marksPerQuestion !== (stats.marks_per_question ?? 0)
+    : false;
 
   return (
     <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -773,6 +794,55 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
                     <CalendarCheck className="h-3.5 w-3.5" />
                   )}
                   Add to Revision Queue
+                </Button>
+              )}
+            </div>
+
+            {/* Exam Weightage */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Exam Weightage</Label>
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                How often this appears in exams and marks per question. Higher weightage = more frequent revisions.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Questions / exam</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={examFrequency}
+                    onChange={(e) => setExamFrequency(Number(e.target.value))}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Marks / question</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={marksPerQuestion}
+                    onChange={(e) => setMarksPerQuestion(Number(e.target.value))}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+              {examFrequency > 0 && marksPerQuestion > 0 && (
+                <div className="text-[11px] text-muted-foreground">
+                  Total weightage: {examFrequency * marksPerQuestion} marks
+                </div>
+              )}
+              {weightageDirty && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={handleWeightageSave}
+                  disabled={saving === "weightage"}
+                >
+                  {saving === "weightage" && (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  )}
+                  Save Weightage
                 </Button>
               )}
             </div>

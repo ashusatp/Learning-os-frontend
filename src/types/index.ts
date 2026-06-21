@@ -157,6 +157,8 @@ export interface SubtopicStats {
   total_mistakes: number;
   unresolved_mistakes: number;
   resolved_mistakes: number;
+  exam_frequency: number;
+  marks_per_question: number;
   created_at: string;
   updated_at: string;
 }

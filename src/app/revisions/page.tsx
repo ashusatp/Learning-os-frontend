@@ -13,6 +13,7 @@ import {
   Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { AuthGuard } from "@/components/auth-guard";
@@ -26,6 +27,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { RevisionCalendar } from "@/components/revision-calendar";
 import { PromotionSuggestion, QualityRating, RevisionQueueItem } from "@/types";
 import { toast } from "sonner";
 
@@ -45,9 +47,11 @@ function GlobalRevisionsContent() {
     dueToday,
     upcoming,
     stats,
+    settings,
     loading,
     error,
     fetchGlobalQueue,
+    fetchSettings,
     completeRevision,
     skipRevision,
     pauseRevision,
@@ -62,8 +66,9 @@ function GlobalRevisionsContent() {
     if (user) {
       fetchGoals(user.id);
       fetchGlobalQueue();
+      fetchSettings();
     }
-  }, [user, fetchGoals, fetchGlobalQueue]);
+  }, [user, fetchGoals, fetchGlobalQueue, fetchSettings]);
 
   const filterItems = useCallback(
     (items: RevisionQueueItem[]) => {
@@ -217,6 +222,30 @@ function GlobalRevisionsContent() {
             />
           </div>
         )}
+
+        {/* Daily progress */}
+        {stats && stats.due_today > 0 && (
+          <div className="mb-6 rounded-lg border bg-card px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium">Today&apos;s Progress</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {stats.completed_today} / {settings?.daily_limit || stats.due_today} done
+              </span>
+            </div>
+            <Progress
+              value={Math.min(
+                100,
+                (stats.completed_today / (settings?.daily_limit || stats.due_today)) * 100
+              )}
+              className="h-2"
+            />
+          </div>
+        )}
+
+        {/* Calendar */}
+        <div className="mb-8">
+          <RevisionCalendar />
+        </div>
 
         {/* Promotion suggestion banner */}
         {promotionPending && (
