@@ -10,7 +10,6 @@ import {
   Flame,
   ArrowRight,
   Calendar,
-  TrendingUp,
   ArrowUpCircle,
   ShieldAlert,
 } from "lucide-react";
@@ -27,7 +26,8 @@ import { RevisionCalendar } from "@/components/revision-calendar";
 import { useAuthStore } from "@/stores/auth-store";
 import { useGoalStore } from "@/stores/goal-store";
 import { useRevisionStore } from "@/stores/revision-store";
-import { PromotionSuggestion, QualityRating, RevisionQueueItem } from "@/types";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { PromotionSuggestion, QualityRating } from "@/types";
 import { toast } from "sonner";
 
 const MAX_VISIBLE_CARDS = 5;
@@ -76,7 +76,6 @@ function HomeContent() {
     dueToday,
     upcoming,
     stats,
-    settings,
     loading: revLoading,
     fetchGlobalQueue,
     fetchSettings,
@@ -160,15 +159,25 @@ function HomeContent() {
     [pauseRevision]
   );
 
-  // Merge all items in priority order: overdue → due today → upcoming, capped
-  const allItems = useMemo(() => [...overdue, ...dueToday, ...upcoming], [overdue, dueToday, upcoming]);
-  const visibleItems = useMemo(() => allItems.slice(0, MAX_VISIBLE_CARDS), [allItems]);
-  const hasMore = allItems.length > MAX_VISIBLE_CARDS;
-  const hasRevisions = allItems.length > 0;
+  // Today's items (overdue + due today)
+  const todayItems = useMemo(() => [...overdue, ...dueToday], [overdue, dueToday]);
+  const hasTodayItems = todayItems.length > 0;
+  const allCount = todayItems.length + upcoming.length;
+  const hasRevisions = allCount > 0;
+
+  // Show today items if any, otherwise show upcoming only
+  const visibleToday = useMemo(() => todayItems.slice(0, MAX_VISIBLE_CARDS), [todayItems]);
+  const visibleUpcoming = useMemo(
+    () => (hasTodayItems ? [] : upcoming.slice(0, MAX_VISIBLE_CARDS)),
+    [upcoming, hasTodayItems]
+  );
+  const activeList = hasTodayItems ? todayItems : upcoming;
+  const hasMore = activeList.length > MAX_VISIBLE_CARDS;
 
   const revIsEmpty = !revLoading && !hasRevisions;
 
   return (
+    <TooltipProvider>
     <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
@@ -202,43 +211,55 @@ function HomeContent() {
                     icon={<Clock className="h-4 w-4 text-violet-500" />}
                     label="Due Today"
                     value={stats.due_today}
+                    tooltip="Total revisions due today, including any overdue items carried forward"
                   />
                   <StatCard
                     icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
                     label="Overdue"
                     value={stats.overdue_count}
                     alert={stats.overdue_count > 0}
+                    tooltip="Revisions that were due on a previous day but haven't been completed yet"
                   />
                   <StatCard
                     icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
                     label="Done Today"
                     value={stats.completed_today}
+                    tooltip="Number of revisions you've completed today"
                   />
                   <StatCard
                     icon={<Flame className="h-4 w-4 text-orange-500" />}
                     label="Streak"
                     value={`${stats.daily_streak}d`}
+                    subValue={`Best: ${stats.longest_streak}d`}
+                    tooltip="Consecutive days with at least one completed revision. Resets if you miss a day."
                   />
                 </div>
               )}
 
               {/* Daily progress */}
-              {stats && stats.due_today > 0 && (
-                <div className="mb-6 rounded-lg border bg-card px-4 py-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium">Today&apos;s Progress</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {stats.completed_today} / {settings?.daily_limit || stats.due_today} done
-                    </span>
-                  </div>
-                  <Progress
-                    value={Math.min(
-                      100,
-                      (stats.completed_today / (settings?.daily_limit || stats.due_today)) * 100
-                    )}
-                    className="h-2"
-                  />
-                </div>
+              {stats && (stats.due_today > 0 || stats.completed_today > 0) && (
+                <Tooltip>
+                  <TooltipTrigger render={<div />}>
+                    <div className="mb-6 rounded-lg border bg-card px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium">Today&apos;s Progress</span>
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {stats.completed_today} / {stats.due_today + stats.completed_today} done
+                        </span>
+                      </div>
+                      <Progress
+                        value={Math.min(
+                          100,
+                          (stats.completed_today / (stats.due_today + stats.completed_today)) * 100
+                        )}
+                        className="h-2"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Tracks your progress for today — includes overdue items carried forward plus today&apos;s scheduled revisions
+                  </TooltipContent>
+                </Tooltip>
               )}
 
               {/* Promotion suggestion banner */}
@@ -315,27 +336,54 @@ function HomeContent() {
                 </div>
               )}
 
-              {/* Revision cards (limited) */}
+              {/* Revision cards */}
               {!revLoading && hasRevisions && (
-                <div className="space-y-2">
-                  {visibleItems.map((item) => (
-                    <RevisionCard
-                      key={item.schedule_id}
-                      item={item}
-                      onComplete={handleComplete}
-                      onSkip={handleSkip}
-                      onPause={handlePause}
-                      completing={completingId === item.schedule_id}
-                    />
-                  ))}
+                <div className="space-y-4">
+                  {hasTodayItems ? (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="h-3.5 w-3.5 text-violet-500" />
+                        <h3 className="text-xs font-medium">Today ({todayItems.length})</h3>
+                      </div>
+                      <div className="space-y-2">
+                        {visibleToday.map((item) => (
+                          <RevisionCard
+                            key={item.schedule_id}
+                            item={item}
+                            onComplete={handleComplete}
+                            onSkip={handleSkip}
+                            onPause={handlePause}
+                            completing={completingId === item.schedule_id}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                        <h3 className="text-xs font-medium">Upcoming ({upcoming.length})</h3>
+                      </div>
+                      <div className="space-y-2">
+                        {visibleUpcoming.map((item) => (
+                          <RevisionCard
+                            key={item.schedule_id}
+                            item={item}
+                            onComplete={handleComplete}
+                            onSkip={handleSkip}
+                            onPause={handlePause}
+                            completing={completingId === item.schedule_id}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* View all link */}
                   {hasMore && (
                     <Link href="/revisions">
                       <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed bg-card/50 px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors cursor-pointer">
-                        <span>
-                          View all {allItems.length} revisions
-                        </span>
+                        <span>View all {activeList.length} revisions</span>
                         <ArrowRight className="h-3.5 w-3.5" />
                       </div>
                     </Link>
@@ -348,29 +396,6 @@ function HomeContent() {
             <div className="w-full lg:w-[340px] shrink-0">
               <div className="lg:sticky lg:top-8 space-y-4">
                 <RevisionCalendar />
-
-                {/* Completion rates */}
-                {stats &&
-                  (stats.completion_rate_7d > 0 || stats.completion_rate_30d > 0) && (
-                    <div className="rounded-lg border bg-card px-4 py-3">
-                      <div className="flex items-center gap-2 mb-3">
-                        <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs font-medium">Completion Rates</span>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Last 7 days</span>
-                          <span className="text-xs font-medium">{stats.completion_rate_7d}%</span>
-                        </div>
-                        <Progress value={stats.completion_rate_7d} className="h-1.5" />
-                        <div className="flex items-center justify-between pt-1">
-                          <span className="text-xs text-muted-foreground">Last 30 days</span>
-                          <span className="text-xs font-medium">{stats.completion_rate_30d}%</span>
-                        </div>
-                        <Progress value={stats.completion_rate_30d} className="h-1.5" />
-                      </div>
-                    </div>
-                  )}
               </div>
             </div>
           </div>
@@ -429,6 +454,7 @@ function HomeContent() {
         </div>
       </main>
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -436,14 +462,18 @@ function StatCard({
   icon,
   label,
   value,
+  subValue,
   alert,
+  tooltip,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number | string;
+  subValue?: string;
   alert?: boolean;
+  tooltip?: string;
 }) {
-  return (
+  const card = (
     <div
       className={`rounded-lg border bg-card px-4 py-3 ${
         alert ? "border-red-300 dark:border-red-800" : ""
@@ -453,7 +483,21 @@ function StatCard({
         {icon}
         <span className="text-[11px] text-muted-foreground">{label}</span>
       </div>
-      <span className="text-xl font-bold">{value}</span>
+      <div className="flex items-baseline gap-2">
+        <span className="text-xl font-bold">{value}</span>
+        {subValue && <span className="text-[10px] text-muted-foreground">{subValue}</span>}
+      </div>
     </div>
+  );
+
+  if (!tooltip) return card;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<div />}>
+        {card}
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }

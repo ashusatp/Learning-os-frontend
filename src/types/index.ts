@@ -297,6 +297,37 @@ export interface RevisionCompleteResponse {
   penalty_applied: PenaltyApplied | null;
 }
 
+export interface CalendarScheduledItem {
+  schedule_id: string;
+  subtopic_id: string;
+  subtopic_name: string;
+  mastery_level: string;
+  topic_name: string;
+  subject_name: string;
+  goal_id: string;
+  goal_title: string;
+  next_revision_at: string;
+  current_interval_days: number;
+}
+
+export interface CalendarCompletedItem {
+  subtopic_id: string;
+  subtopic_name: string;
+  mastery_level: string;
+  topic_name: string;
+  subject_name: string;
+  goal_id: string;
+  goal_title: string;
+  quality_rating: string;
+  completed_at: string;
+}
+
+export interface CalendarDateItems {
+  date: string;
+  scheduled: CalendarScheduledItem[];
+  completed: CalendarCompletedItem[];
+}
+
 export interface UserRevisionSettings {
   id: string;
   user_id: string;

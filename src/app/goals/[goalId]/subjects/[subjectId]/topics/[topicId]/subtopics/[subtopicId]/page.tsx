@@ -18,6 +18,8 @@ import {
   Maximize2,
   Minimize2,
   CalendarCheck,
+  Play,
+  Pause,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -620,6 +622,28 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
     }
   };
 
+  const handlePauseSchedule = async () => {
+    if (!revSchedule) return;
+    setSaving("schedule");
+    try {
+      const res = await api.post(`/revisions/${revSchedule.id}/pause`);
+      setRevSchedule(res.data);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleResumeSchedule = async () => {
+    if (!revSchedule) return;
+    setSaving("schedule");
+    try {
+      const res = await api.post(`/revisions/${revSchedule.id}/resume`);
+      setRevSchedule(res.data);
+    } finally {
+      setSaving(null);
+    }
+  };
+
   const handleRevision = async () => {
     setSaving("revision");
     try {
@@ -768,16 +792,41 @@ function StatsPanel({ topicId, subtopicId }: StatsPanelProps) {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">Status</span>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] px-1.5 py-0 ${
-                        revSchedule.is_active
-                          ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
-                      }`}
-                    >
-                      {revSchedule.is_active ? "Active" : "Paused"}
-                    </Badge>
+                    <div className="flex items-center gap-1.5">
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-1.5 py-0 ${
+                          revSchedule.is_active
+                            ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
+                            : "bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
+                        }`}
+                      >
+                        {revSchedule.is_active ? "Active" : "Paused"}
+                      </Badge>
+                      {revSchedule.is_active ? (
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          className="h-5 px-1.5 text-[10px] gap-0.5"
+                          onClick={handlePauseSchedule}
+                          disabled={saving === "schedule"}
+                        >
+                          <Pause className="h-2.5 w-2.5" />
+                          Pause
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          className="h-5 px-1.5 text-[10px] gap-0.5 text-green-600 hover:text-green-700"
+                          onClick={handleResumeSchedule}
+                          disabled={saving === "schedule"}
+                        >
+                          <Play className="h-2.5 w-2.5" />
+                          Resume
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (

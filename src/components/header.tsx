@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, LogOut, Sun, Moon } from "lucide-react";
+import { BookOpen, LogOut, Sun, Moon, User as UserIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
   DropdownMenu,
@@ -115,6 +115,10 @@ export function Header({ breadcrumbs }: HeaderProps) {
                   <p className="text-xs text-muted-foreground">{user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push("/profile")}>
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout

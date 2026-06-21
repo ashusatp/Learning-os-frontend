@@ -28,8 +28,11 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { RevisionCalendar } from "@/components/revision-calendar";
-import { PromotionSuggestion, QualityRating, RevisionQueueItem } from "@/types";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { CalendarCompletedItem, CalendarDateItems, PromotionSuggestion, QualityRating, RevisionQueueItem } from "@/types";
 import { toast } from "sonner";
+import api from "@/lib/api";
 
 export default function GlobalRevisionsPage() {
   return (
@@ -47,7 +50,6 @@ function GlobalRevisionsContent() {
     dueToday,
     upcoming,
     stats,
-    settings,
     loading,
     error,
     fetchGlobalQueue,
@@ -61,6 +63,36 @@ function GlobalRevisionsContent() {
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [promotionPending, setPromotionPending] = useState<PromotionSuggestion | null>(null);
   const [goalFilter, setGoalFilter] = useState<string>("all");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dateItems, setDateItems] = useState<CalendarDateItems | null>(null);
+  const [dateLoading, setDateLoading] = useState(false);
+
+  const todayStr = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }, []);
+  const isSelectedToday = selectedDate === todayStr;
+
+  const handleDateSelect = useCallback(async (date: string | null) => {
+    setSelectedDate(date);
+    if (!date) {
+      setDateItems(null);
+      return;
+    }
+    setDateLoading(true);
+    try {
+      const res = await api.get<CalendarDateItems>(`/revisions/calendar/${date}`);
+      setDateItems(res.data);
+    } catch {
+      setDateItems(null);
+    }
+    setDateLoading(false);
+  }, []);
+
+  // Auto-select today on mount to show completed items
+  useEffect(() => {
+    handleDateSelect(todayStr);
+  }, [todayStr]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (user) {
@@ -159,8 +191,9 @@ function GlobalRevisionsContent() {
     filteredUpcoming.length === 0;
 
   return (
+    <TooltipProvider>
     <div className="flex min-h-screen flex-col bg-background">
-      <Header />
+      <Header breadcrumbs={[{ label: "Revisions" }]} />
 
       <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
         {/* Title + Filter */}
@@ -207,43 +240,55 @@ function GlobalRevisionsContent() {
                   icon={<Clock className="h-4 w-4 text-violet-500" />}
                   label="Due Today"
                   value={stats.due_today}
+                  tooltip="Total revisions due today, including any overdue items carried forward"
                 />
                 <StatCard
                   icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
                   label="Overdue"
                   value={stats.overdue_count}
                   alert={stats.overdue_count > 0}
+                  tooltip="Revisions that were due on a previous day but haven't been completed yet"
                 />
                 <StatCard
                   icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
                   label="Done Today"
                   value={stats.completed_today}
+                  tooltip="Number of revisions you've completed today"
                 />
                 <StatCard
                   icon={<Flame className="h-4 w-4 text-orange-500" />}
                   label="Streak"
                   value={`${stats.daily_streak}d`}
+                  subValue={`Best: ${stats.longest_streak}d`}
+                  tooltip="Consecutive days with at least one completed revision. Resets if you miss a day."
                 />
               </div>
             )}
 
             {/* Daily progress */}
-            {stats && stats.due_today > 0 && (
-              <div className="mb-6 rounded-lg border bg-card px-4 py-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium">Today&apos;s Progress</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {stats.completed_today} / {settings?.daily_limit || stats.due_today} done
-                  </span>
-                </div>
-                <Progress
-                  value={Math.min(
-                    100,
-                    (stats.completed_today / (settings?.daily_limit || stats.due_today)) * 100
-                  )}
-                  className="h-2"
-                />
-              </div>
+            {stats && (stats.due_today > 0 || stats.completed_today > 0) && (
+              <Tooltip>
+                <TooltipTrigger render={<div />}>
+                  <div className="mb-6 rounded-lg border bg-card px-4 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium">Today&apos;s Progress</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {stats.completed_today} / {stats.due_today + stats.completed_today} done
+                      </span>
+                    </div>
+                    <Progress
+                      value={Math.min(
+                        100,
+                        (stats.completed_today / (stats.due_today + stats.completed_today)) * 100
+                      )}
+                      className="h-2"
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Tracks your progress for today — includes overdue items carried forward plus today&apos;s scheduled revisions
+                </TooltipContent>
+              </Tooltip>
             )}
 
             {/* Promotion suggestion banner */}
@@ -293,118 +338,282 @@ function GlobalRevisionsContent() {
               </div>
             )}
 
-            {/* Loading */}
-            {loading && (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="rounded-lg border bg-card px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-4 flex-1" />
-                      <Skeleton className="h-4 w-20 rounded-full" />
-                    </div>
+            {/* Date selected (non-today) → show date items panel */}
+            {selectedDate && !isSelectedToday ? (
+              <DateItemsPanel
+                date={selectedDate}
+                items={dateItems}
+                loading={dateLoading}
+                onClear={() => handleDateSelect(null)}
+              />
+            ) : (
+              <>
+                {/* Loading */}
+                {loading && (
+                  <div className="space-y-3">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="rounded-lg border bg-card px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-4 flex-1" />
+                          <Skeleton className="h-4 w-20 rounded-full" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Error */}
-            {error && (
-              <div className="flex items-center justify-center py-16 text-destructive gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                {error}
-              </div>
-            )}
-
-            {/* Empty state */}
-            {isEmpty && (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                  <CheckCircle2 className="h-8 w-8 text-green-500" />
-                </div>
-                <p className="text-lg font-medium">All caught up!</p>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  No revisions due. Start studying subtopics and they&apos;ll appear
-                  here when it&apos;s time to review.
-                </p>
-              </div>
-            )}
-
-            {/* Queue sections */}
-            {!loading && !error && !isEmpty && (
-              <div className="space-y-6">
-                {filteredOverdue.length > 0 && (
-                  <QueueSection
-                    title="Overdue"
-                    icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
-                    count={filteredOverdue.length}
-                    items={filteredOverdue}
-                    completingId={completingId}
-                    onComplete={handleComplete}
-                    onSkip={handleSkip}
-                    onPause={handlePause}
-                  />
                 )}
 
-                {filteredDueToday.length > 0 && (
-                  <QueueSection
-                    title="Due Today"
-                    icon={<Clock className="h-4 w-4 text-violet-500" />}
-                    count={filteredDueToday.length}
-                    items={filteredDueToday}
-                    completingId={completingId}
-                    onComplete={handleComplete}
-                    onSkip={handleSkip}
-                    onPause={handlePause}
-                  />
+                {/* Error */}
+                {error && (
+                  <div className="flex items-center justify-center py-16 text-destructive gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    {error}
+                  </div>
                 )}
 
-                {filteredUpcoming.length > 0 && (
-                  <QueueSection
-                    title="Upcoming (next 3 days)"
-                    icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-                    count={filteredUpcoming.length}
-                    items={filteredUpcoming}
-                    completingId={completingId}
-                    onComplete={handleComplete}
-                    onSkip={handleSkip}
-                    onPause={handlePause}
-                  />
+                {/* Empty state */}
+                {isEmpty && !isSelectedToday && (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                      <CheckCircle2 className="h-8 w-8 text-green-500" />
+                    </div>
+                    <p className="text-lg font-medium">All caught up!</p>
+                    <p className="text-sm text-muted-foreground max-w-sm">
+                      No revisions due. Start studying subtopics and they&apos;ll appear
+                      here when it&apos;s time to review.
+                    </p>
+                  </div>
                 )}
-              </div>
+
+                {/* Queue sections */}
+                {!loading && !error && (
+                  <div className="space-y-6">
+                    {filteredOverdue.length > 0 && (
+                      <QueueSection
+                        title="Overdue"
+                        icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
+                        count={filteredOverdue.length}
+                        items={filteredOverdue}
+                        completingId={completingId}
+                        onComplete={handleComplete}
+                        onSkip={handleSkip}
+                        onPause={handlePause}
+                      />
+                    )}
+
+                    {filteredDueToday.length > 0 && (
+                      <QueueSection
+                        title="Due Today"
+                        icon={<Clock className="h-4 w-4 text-violet-500" />}
+                        count={filteredDueToday.length}
+                        items={filteredDueToday}
+                        completingId={completingId}
+                        onComplete={handleComplete}
+                        onSkip={handleSkip}
+                        onPause={handlePause}
+                      />
+                    )}
+
+                    {filteredUpcoming.length > 0 && (
+                      <QueueSection
+                        title="Upcoming (next 3 days)"
+                        icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+                        count={filteredUpcoming.length}
+                        items={filteredUpcoming}
+                        completingId={completingId}
+                        onComplete={handleComplete}
+                        onSkip={handleSkip}
+                        onPause={handlePause}
+                      />
+                    )}
+
+                    {/* Completed today — shown when today is selected on calendar */}
+                    {isSelectedToday && dateItems && dateItems.completed.length > 0 && (
+                      <CompletedSection items={dateItems.completed} />
+                    )}
+
+                    {isEmpty && isSelectedToday && (!dateItems || dateItems.completed.length === 0) && (
+                      <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                          <CheckCircle2 className="h-8 w-8 text-green-500" />
+                        </div>
+                        <p className="text-lg font-medium">All caught up!</p>
+                        <p className="text-sm text-muted-foreground max-w-sm">
+                          No revisions due. Start studying subtopics and they&apos;ll appear
+                          here when it&apos;s time to review.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Right column — calendar + completion rates (sticky) */}
           <div className="w-full lg:w-[340px] shrink-0">
             <div className="lg:sticky lg:top-8 space-y-4">
-              <RevisionCalendar />
+              <RevisionCalendar selectedDate={selectedDate} onDateSelect={handleDateSelect} />
 
               {/* Completion rates */}
               {stats &&
                 (stats.completion_rate_7d > 0 || stats.completion_rate_30d > 0) && (
-                  <div className="rounded-lg border bg-card px-4 py-3">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs font-medium">Completion Rates</span>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Last 7 days</span>
-                        <span className="text-xs font-medium">{stats.completion_rate_7d}%</span>
+                  <Tooltip>
+                    <TooltipTrigger render={<div />}>
+                      <div className="rounded-lg border bg-card px-4 py-3">
+                        <div className="flex items-center gap-2 mb-3">
+                          <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-xs font-medium">Completion Rates</span>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Last 7 days</span>
+                            <span className="text-xs font-medium">{stats.completion_rate_7d}%</span>
+                          </div>
+                          <Progress value={stats.completion_rate_7d} className="h-1.5" />
+                          <div className="flex items-center justify-between pt-1">
+                            <span className="text-xs text-muted-foreground">Last 30 days</span>
+                            <span className="text-xs font-medium">{stats.completion_rate_30d}%</span>
+                          </div>
+                          <Progress value={stats.completion_rate_30d} className="h-1.5" />
+                        </div>
                       </div>
-                      <Progress value={stats.completion_rate_7d} className="h-1.5" />
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-xs text-muted-foreground">Last 30 days</span>
-                        <span className="text-xs font-medium">{stats.completion_rate_30d}%</span>
-                      </div>
-                      <Progress value={stats.completion_rate_30d} className="h-1.5" />
-                    </div>
-                  </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      Percentage of due revisions you completed vs skipped or missed
+                    </TooltipContent>
+                  </Tooltip>
                 )}
+
             </div>
           </div>
         </div>
       </main>
+    </div>
+    </TooltipProvider>
+  );
+}
+
+const MASTERY_STYLES: Record<string, string> = {
+  BEGINNER: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+  INTERMEDIATE: "bg-yellow-100 text-yellow-700 dark:bg-amber-500/20 dark:text-amber-300",
+  ADVANCED: "bg-blue-100 text-blue-700 dark:bg-sky-500/20 dark:text-sky-300",
+  MASTERED: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300",
+};
+
+const RATING_LABELS: Record<string, { label: string; color: string }> = {
+  AGAIN: { label: "Again", color: "text-red-500" },
+  HARD: { label: "Hard", color: "text-orange-500" },
+  GOOD: { label: "Good", color: "text-green-500" },
+  EASY: { label: "Easy", color: "text-blue-500" },
+};
+
+function DateItemsPanel({
+  date,
+  items,
+  loading,
+  onClear,
+}: {
+  date: string;
+  items: CalendarDateItems | null;
+  loading: boolean;
+  onClear: () => void;
+}) {
+  const [y, m, d] = date.split("-").map(Number);
+  const formatted = new Date(y, m - 1, d).toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">{formatted}</h3>
+        </div>
+        <Button variant="ghost" size="sm" className="text-xs h-7" onClick={onClear}>
+          Back to queue
+        </Button>
+      </div>
+
+      {loading && (
+        <div className="space-y-3">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="rounded-lg border bg-card px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-20 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && items && (
+        <div className="space-y-5">
+          {items.scheduled.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Clock className="h-3.5 w-3.5 text-violet-500" />
+                <span className="text-xs font-medium">Scheduled ({items.scheduled.length})</span>
+              </div>
+              <div className="space-y-2">
+                {items.scheduled.map((item) => (
+                  <div key={item.schedule_id} className="rounded-lg border border-l-4 border-l-violet-500 bg-card px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold truncate">{item.subtopic_name}</span>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-1.5 py-0 shrink-0 ${MASTERY_STYLES[item.mastery_level] || ""}`}
+                      >
+                        {item.mastery_level}
+                      </Badge>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">
+                      {item.goal_title} &rsaquo; {item.subject_name} &rsaquo; {item.topic_name}
+                    </span>
+                    <div className="text-[10px] text-muted-foreground mt-1">
+                      Interval: {item.current_interval_days}d
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {items.completed.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                <span className="text-xs font-medium">Completed ({items.completed.length})</span>
+              </div>
+              <div className="space-y-2">
+                {items.completed.map((item, i) => (
+                  <div key={`${item.subtopic_id}-${i}`} className="rounded-lg border border-l-4 border-l-green-500 bg-card px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold truncate">{item.subtopic_name}</span>
+                      <span className={`text-xs font-medium shrink-0 ${RATING_LABELS[item.quality_rating]?.color || ""}`}>
+                        {RATING_LABELS[item.quality_rating]?.label || item.quality_rating}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">
+                      {item.goal_title} &rsaquo; {item.subject_name} &rsaquo; {item.topic_name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {items.scheduled.length === 0 && items.completed.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
+              <p className="text-sm text-muted-foreground">No revisions on this date</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -413,14 +622,18 @@ function StatCard({
   icon,
   label,
   value,
+  subValue,
   alert,
+  tooltip,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number | string;
+  subValue?: string;
   alert?: boolean;
+  tooltip?: string;
 }) {
-  return (
+  const card = (
     <div
       className={`rounded-lg border bg-card px-4 py-3 ${
         alert ? "border-red-300 dark:border-red-800" : ""
@@ -430,8 +643,22 @@ function StatCard({
         {icon}
         <span className="text-[11px] text-muted-foreground">{label}</span>
       </div>
-      <span className="text-xl font-bold">{value}</span>
+      <div className="flex items-baseline gap-2">
+        <span className="text-xl font-bold">{value}</span>
+        {subValue && <span className="text-[10px] text-muted-foreground">{subValue}</span>}
+      </div>
     </div>
+  );
+
+  if (!tooltip) return card;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<div />}>
+        {card}
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -471,6 +698,36 @@ function QueueSection({
             onPause={onPause}
             completing={completingId === item.schedule_id}
           />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CompletedSection({ items }: { items: CalendarCompletedItem[] }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <CheckCircle2 className="h-4 w-4 text-green-500" />
+        <h2 className="text-sm font-medium">Completed Today</h2>
+        <span className="text-[11px] text-muted-foreground">({items.length})</span>
+      </div>
+      <div className="space-y-2">
+        {items.map((item, i) => (
+          <div
+            key={`${item.subtopic_id}-${i}`}
+            className="rounded-lg border border-l-4 border-l-green-500 bg-card px-4 py-3"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold truncate">{item.subtopic_name}</span>
+              <span className={`text-xs font-medium shrink-0 ${RATING_LABELS[item.quality_rating]?.color || ""}`}>
+                {RATING_LABELS[item.quality_rating]?.label || item.quality_rating}
+              </span>
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              {item.goal_title} &rsaquo; {item.subject_name} &rsaquo; {item.topic_name}
+            </span>
+          </div>
         ))}
       </div>
     </div>
