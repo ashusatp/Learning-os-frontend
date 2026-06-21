@@ -38,6 +38,12 @@ interface MistakeEditorProps {
   }) => void;
   onCancel: () => void;
   saving?: boolean;
+  aiHierarchy?: {
+    goal?: string;
+    subject?: string;
+    topic?: string;
+    subtopic?: string;
+  };
 }
 
 export function MistakeEditor({
@@ -47,6 +53,7 @@ export function MistakeEditor({
   onSave,
   onCancel,
   saving,
+  aiHierarchy,
 }: MistakeEditorProps) {
   const [mistakeType, setMistakeType] = useState<MistakeType>(
     mistake?.mistake_type || "OTHER"
@@ -170,6 +177,8 @@ export function MistakeEditor({
             content={descriptionHtml}
             onChange={setDescriptionHtml}
             placeholder="Describe the mistake..."
+            aiEnabled={!!aiHierarchy}
+            aiHierarchy={aiHierarchy}
           />
         </div>
       </div>
@@ -203,6 +212,8 @@ export function MistakeEditor({
               content={correctionHtml}
               onChange={setCorrectionHtml}
               placeholder="Write the correct approach..."
+              aiEnabled={!!aiHierarchy}
+              aiHierarchy={aiHierarchy}
             />
           </div>
         </div>

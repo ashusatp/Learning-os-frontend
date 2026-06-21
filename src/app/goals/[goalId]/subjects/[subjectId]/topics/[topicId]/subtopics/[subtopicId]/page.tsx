@@ -488,12 +488,22 @@ function SubtopicDetailContent() {
                 )}
                 {activeTab === "questions" && (
                   <div className="h-full overflow-y-auto">
-                    <QuestionList subtopicId={subtopicId} />
+                    <QuestionList subtopicId={subtopicId} aiHierarchy={{
+                      goal: activeGoal?.title,
+                      subject: activeSubject?.name,
+                      topic: activeTopic?.name,
+                      subtopic: subtopic?.name,
+                    }} />
                   </div>
                 )}
                 {activeTab === "mistakes" && (
                   <div className="h-full overflow-y-auto">
-                    <MistakeList subtopicId={subtopicId} questions={questions} />
+                    <MistakeList subtopicId={subtopicId} questions={questions} aiHierarchy={{
+                      goal: activeGoal?.title,
+                      subject: activeSubject?.name,
+                      topic: activeTopic?.name,
+                      subtopic: subtopic?.name,
+                    }} />
                   </div>
                 )}
               </div>

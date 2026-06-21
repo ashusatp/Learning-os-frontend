@@ -56,6 +56,12 @@ interface SubtopicDetailModalProps {
   topicName?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  aiHierarchy?: {
+    goal?: string;
+    subject?: string;
+    topic?: string;
+    subtopic?: string;
+  };
 }
 
 export function SubtopicDetailModal({
@@ -63,6 +69,7 @@ export function SubtopicDetailModal({
   topicName,
   open,
   onOpenChange,
+  aiHierarchy,
 }: SubtopicDetailModalProps) {
   const [mode, setMode] = useState<Mode>("view");
   const [activeTab, setActiveTab] = useState<Tab>("notes");
@@ -289,6 +296,8 @@ export function SubtopicDetailModal({
               content={notesHtml}
               onChange={setNotesHtml}
               placeholder="Write your study notes here..."
+              aiEnabled={!!aiHierarchy}
+              aiHierarchy={aiHierarchy}
             />
           </div>
 

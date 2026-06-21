@@ -650,6 +650,12 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     { content = "", onChange, placeholder = "Start writing your notes...", aiEnabled = false, aiHierarchy },
     ref,
   ) {
+    // Platform detection (safe for SSR — defaults to Mac, corrects after mount)
+    const [modKey, setModKey] = useState("⌘");
+    useEffect(() => {
+      if (!/Mac/i.test(navigator.userAgent)) setModKey("Ctrl+");
+    }, []);
+
     // Popover states
     const [pop, setPop] = useState<string | null>(null);
     // AI state
@@ -791,7 +797,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                   if (!enabledRef.current) return false;
 
                   // Cmd+J / Ctrl+J → open AI help
-                  if (event.key === "j" && (event.metaKey || event.ctrlKey)) {
+                  if (event.key.toLowerCase() === "j" && (event.metaKey || event.ctrlKey)) {
                     event.preventDefault();
                     const { state } = view;
                     const { from, to } = state.selection;
@@ -1350,7 +1356,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                     <div className="space-y-1.5 text-[11px] text-muted-foreground">
                       <div className="flex items-center justify-between">
                         <span>Keyboard shortcut</span>
-                        <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">{typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent) ? "⌘J" : "Ctrl+J"}</kbd>
+                        <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">{modKey}J</kbd>
                       </div>
                       <div className="flex items-center justify-between">
                         <span>Slash command</span>
@@ -1358,7 +1364,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
                       </div>
                       <div className="flex items-center justify-between">
                         <span>Selected text</span>
-                        <span className="text-[10px]">Select → {typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent) ? "⌘J" : "Ctrl+J"}</span>
+                        <span className="text-[10px]">Select → {modKey}J</span>
                       </div>
                     </div>
                   </div>
@@ -1441,7 +1447,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
               <div className="w-px h-4 bg-border mx-0.5" />
               <TBtn
                 onClick={handleAskAISelection}
-                title={`Ask AI about selection (${typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent) ? "⌘" : "Ctrl+"}J)`}
+                title={`Ask AI about selection (${modKey}J)`}
               >
                 <Sparkles className={IB} />
               </TBtn>

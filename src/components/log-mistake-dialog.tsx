@@ -30,6 +30,7 @@ import { Subject, Topic, SubTopic, Question } from "@/types";
 
 interface LogMistakeDialogProps {
   goalId: string;
+  goalTitle?: string;
   onLogged?: () => void;
 }
 
@@ -56,7 +57,7 @@ function StepIndicator({ step, current, label }: { step: number; current: number
   );
 }
 
-export function LogMistakeDialog({ goalId, onLogged }: LogMistakeDialogProps) {
+export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDialogProps) {
   const [open, setOpen] = useState(false);
   const { createMistake } = useMistakeStore();
 
@@ -323,6 +324,12 @@ export function LogMistakeDialog({ goalId, onLogged }: LogMistakeDialogProps) {
                 onSave={handleSave}
                 onCancel={() => { setOpen(false); resetState(); }}
                 saving={saving}
+                aiHierarchy={{
+                  goal: goalTitle,
+                  subject: subjects.find((s) => s.id === selectedSubjectId)?.name,
+                  topic: topics.find((t) => t.id === selectedTopicId)?.name,
+                  subtopic: subtopics.find((st) => st.id === selectedSubtopicId)?.name,
+                }}
               />
             </div>
           ) : (

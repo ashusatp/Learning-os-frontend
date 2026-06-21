@@ -89,6 +89,12 @@ interface QuestionEditorProps {
   onSave: (data: QuestionFormData) => Promise<void>;
   onCancel: () => void;
   saving?: boolean;
+  aiHierarchy?: {
+    goal?: string;
+    subject?: string;
+    topic?: string;
+    subtopic?: string;
+  };
 }
 
 type ExplanationTab = "text" | "sketch" | "files";
@@ -259,6 +265,7 @@ function ExplanationContent({
   explanationEditorRef,
   explainTabs,
   fullHeight,
+  aiHierarchy,
 }: {
   form: QuestionFormData;
   setForm: React.Dispatch<React.SetStateAction<QuestionFormData>>;
@@ -267,6 +274,7 @@ function ExplanationContent({
   explanationEditorRef: React.RefObject<RichTextEditorRef | null>;
   explainTabs: { id: ExplanationTab; label: string; icon: React.ReactNode }[];
   fullHeight?: boolean;
+  aiHierarchy?: { goal?: string; subject?: string; topic?: string; subtopic?: string };
 }) {
   return (
     <div className={`border rounded-lg overflow-hidden flex flex-col ${fullHeight ? "flex-1" : ""}`}>
@@ -292,6 +300,8 @@ function ExplanationContent({
           content={form.explanation_html || ""}
           onChange={(html) => setForm((prev) => ({ ...prev, explanation_html: html }))}
           placeholder="Explain the solution..."
+          aiEnabled={!!aiHierarchy}
+          aiHierarchy={aiHierarchy}
         />
       </div>
       {explanationTab === "sketch" && (
@@ -317,7 +327,7 @@ function ExplanationContent({
 // Main Component
 // ══════════════════════════════════════════════
 
-export function QuestionEditor({ question, onSave, onCancel, saving }: QuestionEditorProps) {
+export function QuestionEditor({ question, onSave, onCancel, saving, aiHierarchy }: QuestionEditorProps) {
   const [form, setForm] = useState<QuestionFormData>(() => getInitialForm(question));
   const [showExplanation, setShowExplanation] = useState(!!question?.explanation_html);
   const [explanationTab, setExplanationTab] = useState<ExplanationTab>("text");
@@ -545,6 +555,8 @@ export function QuestionEditor({ question, onSave, onCancel, saving }: QuestionE
             content={form.text_html}
             onChange={(html) => setForm((prev) => ({ ...prev, text_html: html }))}
             placeholder="Write your question here..."
+            aiEnabled={!!aiHierarchy}
+            aiHierarchy={aiHierarchy}
           />
         </div>
 
@@ -675,6 +687,8 @@ export function QuestionEditor({ question, onSave, onCancel, saving }: QuestionE
                 content={form.answer_html || ""}
                 onChange={(html) => setForm((prev) => ({ ...prev, answer_html: html }))}
                 placeholder="Write the model answer here..."
+                aiEnabled={!!aiHierarchy}
+                aiHierarchy={aiHierarchy}
               />
             </div>
           </div>
@@ -708,6 +722,7 @@ export function QuestionEditor({ question, onSave, onCancel, saving }: QuestionE
               setExplanationTab={setExplanationTab}
               explanationEditorRef={explanationEditorRef}
               explainTabs={explainTabs}
+              aiHierarchy={aiHierarchy}
             />
           )}
           {explanationFullscreen && (
@@ -724,6 +739,7 @@ export function QuestionEditor({ question, onSave, onCancel, saving }: QuestionE
                   explanationEditorRef={explanationEditorRef}
                   explainTabs={explainTabs}
                   fullHeight
+                  aiHierarchy={aiHierarchy}
                 />
               </div>
             </FullscreenOverlay>

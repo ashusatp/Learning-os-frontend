@@ -40,9 +40,15 @@ const DIFFICULTY_STYLES: Record<DifficultyLevel, string> = {
 interface QuestionListProps {
   subtopicId: string;
   readOnly?: boolean;
+  aiHierarchy?: {
+    goal?: string;
+    subject?: string;
+    topic?: string;
+    subtopic?: string;
+  };
 }
 
-export function QuestionList({ subtopicId, readOnly }: QuestionListProps) {
+export function QuestionList({ subtopicId, readOnly, aiHierarchy }: QuestionListProps) {
   const {
     questions,
     loading,
@@ -164,6 +170,7 @@ export function QuestionList({ subtopicId, readOnly }: QuestionListProps) {
           onSave={handleSave}
           onCancel={handleCancel}
           saving={saving}
+          aiHierarchy={aiHierarchy}
         />
       </div>
     );

@@ -87,7 +87,7 @@ function GoalDetailContent() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <LogMistakeDialog goalId={goalId} />
+            <LogMistakeDialog goalId={goalId} goalTitle={activeGoal?.title} />
             <CreateDialog
               title="Subject"
               description="Add a new subject to this goal."

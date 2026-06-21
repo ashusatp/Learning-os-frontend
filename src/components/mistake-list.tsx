@@ -46,9 +46,15 @@ interface MistakeListProps {
   subtopicId: string;
   readOnly?: boolean;
   questions?: Question[];
+  aiHierarchy?: {
+    goal?: string;
+    subject?: string;
+    topic?: string;
+    subtopic?: string;
+  };
 }
 
-export function MistakeList({ subtopicId, readOnly, questions }: MistakeListProps) {
+export function MistakeList({ subtopicId, readOnly, questions, aiHierarchy }: MistakeListProps) {
   const {
     mistakes,
     loading,
@@ -180,6 +186,7 @@ export function MistakeList({ subtopicId, readOnly, questions }: MistakeListProp
           onSave={handleSave}
           onCancel={handleCancel}
           saving={saving}
+          aiHierarchy={aiHierarchy}
         />
       </div>
     );

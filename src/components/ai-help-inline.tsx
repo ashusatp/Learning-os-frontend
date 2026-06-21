@@ -21,8 +21,13 @@ import {
 } from "lucide-react";
 import { streamAIResponse } from "@/lib/ai-stream";
 
-const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
-const modKey = isMac ? "⌘" : "Ctrl+";
+function useModKey() {
+  const [mod, setMod] = useState("⌘");
+  useEffect(() => {
+    if (!/Mac/i.test(navigator.userAgent)) setMod("Ctrl+");
+  }, []);
+  return mod;
+}
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -67,6 +72,7 @@ export function AIHelpInline({
   onApprove,
   onClose,
 }: AIHelpInlineProps) {
+  const modKey = useModKey();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
