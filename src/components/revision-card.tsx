@@ -5,13 +5,11 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
-  SkipForward,
-  Pause,
   ExternalLink,
   Flame,
-  TrendingUp,
-  Zap,
-  BarChart3,
+  MoreVertical,
+  SkipForward,
+  Pause,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +18,14 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { QualityRating, RevisionQueueItem } from "@/types";
 
 const MASTERY_STYLES: Record<string, string> = {
@@ -61,9 +66,17 @@ export function RevisionCard({
   completing,
 }: RevisionCardProps) {
   const resolvedGoalId = goalId || item.goal_id;
-  const [open, setOpen] = useState(false);
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"snooze" | "pause" | null>(null);
 
-  const weightage = item.exam_frequency * item.marks_per_question;
+  const handleConfirm = () => {
+    if (confirmAction === "snooze") {
+      onSkip(item.schedule_id);
+    } else if (confirmAction === "pause") {
+      onPause(item.schedule_id);
+    }
+    setConfirmAction(null);
+  };
 
   return (
     <>
@@ -95,8 +108,8 @@ export function RevisionCard({
             </div>
           </div>
 
-          {/* Right: status + action */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Right: status + actions */}
+          <div className="flex items-center gap-2 shrink-0">
             {item.status === "overdue" && (
               <span className="text-[10px] font-medium text-red-500 whitespace-nowrap">
                 {item.days_overdue}d overdue
@@ -114,14 +127,43 @@ export function RevisionCard({
             )}
 
             {item.status !== "upcoming" ? (
-              <Button
-                size="sm"
-                className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => setOpen(true)}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Mark Done
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  className="h-7 text-xs gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => setRatingOpen(true)}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Mark Done
+                </Button>
+
+                {/* 3-dot menu for snooze & pause */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
+                    <MoreVertical className="h-4 w-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setConfirmAction("snooze")}>
+                      <SkipForward className="mr-2 h-4 w-4" />
+                      Snooze 1 day
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setConfirmAction("pause")}>
+                      <Pause className="mr-2 h-4 w-4" />
+                      Pause schedule
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Open subtopic link */}
+                <a
+                  href={`/goals/${resolvedGoalId}/subjects/${item.subject_id}/topics/${item.topic_id}/subtopics/${item.subtopic_id}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </>
             ) : (
               <Clock className="h-4 w-4 text-muted-foreground/50" />
             )}
@@ -129,140 +171,111 @@ export function RevisionCard({
         </div>
       </div>
 
-      {/* Modal */}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-lg">{item.subtopic_name}</DialogTitle>
-            <p className="text-xs text-muted-foreground">
+      {/* Rating modal */}
+      <Dialog open={ratingOpen} onOpenChange={setRatingOpen}>
+        <DialogContent className="sm:max-w-md gap-0">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-lg leading-snug">{item.subtopic_name}</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
               {item.goal_title && <>{item.goal_title} &rsaquo; </>}{item.subject_name} &rsaquo; {item.topic_name}
-            </p>
+            </DialogDescription>
           </DialogHeader>
 
-          {/* Status + mastery */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Badges row */}
+          <div className="flex items-center gap-2 flex-wrap pb-4">
             <Badge
               variant="outline"
-              className={`text-xs px-2 py-0.5 ${MASTERY_STYLES[item.mastery_level] || ""}`}
+              className={`text-[11px] px-2 py-0.5 ${MASTERY_STYLES[item.mastery_level] || ""}`}
             >
               {item.mastery_level}
             </Badge>
             {item.status === "overdue" && (
-              <Badge variant="outline" className="text-xs px-2 py-0.5 text-red-600 border-red-300 dark:border-red-800">
+              <Badge variant="outline" className="text-[11px] px-2 py-0.5 text-red-600 border-red-300 dark:border-red-800">
                 <AlertTriangle className="h-3 w-3 mr-1" />
                 {item.days_overdue}d overdue
               </Badge>
             )}
             {item.mistake_count > 0 && (
-              <Badge variant="outline" className="text-xs px-2 py-0.5">
+              <Badge variant="outline" className="text-[11px] px-2 py-0.5">
                 <AlertTriangle className="h-3 w-3 mr-1" />
                 {item.mistake_count} mistake{item.mistake_count !== 1 ? "s" : ""}
               </Badge>
             )}
             {item.consecutive_successes >= 3 && (
-              <Badge variant="outline" className="text-xs px-2 py-0.5 text-orange-600 border-orange-300 dark:border-orange-800">
+              <Badge variant="outline" className="text-[11px] px-2 py-0.5 text-orange-600 border-orange-300 dark:border-orange-800">
                 <Flame className="h-3 w-3 mr-1" />
                 {item.consecutive_successes} streak
               </Badge>
             )}
           </div>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-3 gap-3 rounded-lg bg-muted/50 p-3">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
-                <Clock className="h-3 w-3" />
-                <span className="text-[10px]">Interval</span>
-              </div>
-              <span className="text-sm font-semibold">{item.current_interval_days}d</span>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
-                <TrendingUp className="h-3 w-3" />
-                <span className="text-[10px]">Ease</span>
-              </div>
-              <span className="text-sm font-semibold">{item.ease_factor.toFixed(2)}</span>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
-                <Zap className="h-3 w-3" />
-                <span className="text-[10px]">Priority</span>
-              </div>
-              <span className="text-sm font-semibold">{item.priority_score.toFixed(1)}</span>
-            </div>
-            {weightage > 0 && (
-              <div className="text-center col-span-3 pt-2 border-t border-border/50">
-                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
-                  <BarChart3 className="h-3 w-3" />
-                  <span className="text-[10px]">Weightage</span>
-                </div>
-                <span className="text-sm font-semibold">{item.exam_frequency} Q &times; {item.marks_per_question} marks</span>
-              </div>
-            )}
-          </div>
-
-          {/* Self-rating */}
+          {/* Self-rating — primary action */}
           {item.status !== "upcoming" && (
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground">
-                How well did you remember this?
+            <div className="space-y-3 pb-4">
+              <p className="text-sm font-medium">
+                Select how well you recalled this to mark it as done
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {RATING_CONFIG.map(({ rating, label, color, bg, desc }) => (
                   <button
                     key={rating}
-                    className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${bg}`}
+                    className={`rounded-xl border-2 px-2 py-3 text-center transition-all hover:scale-[1.03] active:scale-[0.97] ${bg}`}
                     onClick={() => {
                       onComplete(item.schedule_id, rating);
-                      setOpen(false);
+                      setRatingOpen(false);
                     }}
                     disabled={completing}
                   >
-                    <span className={`text-sm font-semibold ${color}`}>{label}</span>
-                    <span className="block text-[10px] text-muted-foreground mt-0.5">{desc}</span>
+                    <span className={`text-sm font-bold block ${color}`}>{label}</span>
+                    <span className="block text-[11px] text-muted-foreground mt-1 leading-tight">{desc}</span>
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => {
-                onSkip(item.schedule_id);
-                setOpen(false);
-              }}
-            >
-              <SkipForward className="h-3.5 w-3.5" />
-              Snooze 1d
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/40 p-2.5 text-center">
+            <div>
+              <span className="text-[10px] text-muted-foreground block">Interval</span>
+              <span className="text-xs font-semibold">{item.current_interval_days}d</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-muted-foreground block">Ease</span>
+              <span className="text-xs font-semibold">{item.ease_factor.toFixed(2)}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-muted-foreground block">Priority</span>
+              <span className="text-xs font-semibold">{item.priority_score.toFixed(1)}</span>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation dialog for snooze/pause */}
+      <Dialog open={confirmAction !== null} onOpenChange={(v) => !v && setConfirmAction(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {confirmAction === "snooze" ? "Snooze revision?" : "Pause schedule?"}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground pt-1">
+              {confirmAction === "snooze"
+                ? `This will postpone "${item.subtopic_name}" by 1 day. You can review it tomorrow.`
+                : `This will pause all future revisions for "${item.subtopic_name}" until you resume it manually.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setConfirmAction(null)}>
+              Cancel
             </Button>
             <Button
-              variant="outline"
               size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => {
-                onPause(item.schedule_id);
-                setOpen(false);
-              }}
+              variant={confirmAction === "pause" ? "destructive" : "default"}
+              onClick={handleConfirm}
             >
-              <Pause className="h-3.5 w-3.5" />
-              Pause
+              {confirmAction === "snooze" ? "Snooze 1 day" : "Pause"}
             </Button>
-            <div className="flex-1" />
-            <a
-              href={`/goals/${resolvedGoalId}/subjects/${item.subject_id}/topics/${item.topic_id}/subtopics/${item.subtopic_id}`}
-              target="_blank"
-              rel="noopener"
-            >
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                <ExternalLink className="h-3.5 w-3.5" />
-                Open Subtopic
-              </Button>
-            </a>
           </div>
         </DialogContent>
       </Dialog>

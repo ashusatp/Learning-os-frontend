@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { BookMarked, CalendarCheck } from "lucide-react";
+import { BookMarked, CalendarCheck, Archive } from "lucide-react";
 import { Header, BreadcrumbEntry } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { SubjectCard } from "@/components/subject-card";
@@ -45,8 +45,9 @@ function GoalDetailContent() {
 
   const { user } = useAuthStore();
   const { activeGoal, goals, setActiveGoal, fetchGoals } = useGoalStore();
-  const { subjects, loading, error, fetchSubjects, createSubject } =
+  const { subjects, loading, error, fetchSubjects, createSubject, archiveSubject } =
     useSubjectStore();
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     if (user && goals.length === 0) {
@@ -60,8 +61,8 @@ function GoalDetailContent() {
   }, [goals, goalId, setActiveGoal]);
 
   useEffect(() => {
-    if (goalId) fetchSubjects(goalId);
-  }, [goalId, fetchSubjects]);
+    if (goalId) fetchSubjects(goalId, showArchived);
+  }, [goalId, fetchSubjects, showArchived]);
 
   const handleCreateSubject = async (
     data: Record<string, string | number>
@@ -80,15 +81,22 @@ function GoalDetailContent() {
         <div className="flex items-center justify-between mb-8 animate-fade-in-up">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              {activeGoal?.title || "Subjects"}
+              {activeGoal?.title || "Goal"}
             </h1>
-            {activeGoal?.description && (
-              <p className="text-muted-foreground mt-1">
-                {activeGoal.description}
-              </p>
-            )}
+            <p className="text-muted-foreground mt-1">
+              {activeGoal?.description || "Subjects in this goal"}
+            </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant={showArchived ? "secondary" : "outline"}
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setShowArchived((v) => !v)}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              {showArchived ? "Hide Archived" : "Show Archived"}
+            </Button>
             <Link href={`/goals/${goalId}/revisions`}>
               <Button variant="outline" size="sm" className="gap-1.5">
                 <CalendarCheck className="h-4 w-4" />
@@ -113,31 +121,53 @@ function GoalDetailContent() {
           </div>
         )}
 
-        {!loading && !error && subjects.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in-up">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
-              <BookMarked className="h-8 w-8 text-primary" />
-            </div>
-            <h2 className="text-xl font-semibold mb-2">No subjects yet</h2>
-            <p className="text-muted-foreground mb-6 max-w-sm">
-              Add subjects to organize your learning material for this goal.
-            </p>
-          </div>
-        )}
-
-        {!loading && subjects.length > 0 && (
-          <div className="flex flex-col gap-3 max-w-2xl">
-            {subjects.map((subject, i) => (
-              <div
-                key={subject.id}
-                className="animate-card-enter"
-                style={{ animationDelay: `${i * 60}ms` }}
-              >
-                <SubjectCard subject={subject} goalId={goalId} />
+        {!loading && !error && (() => {
+          const filtered = showArchived
+            ? subjects.filter((s) => s.is_archived)
+            : subjects.filter((s) => !s.is_archived);
+          return filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in-up">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+                {showArchived ? (
+                  <Archive className="h-8 w-8 text-muted-foreground" />
+                ) : (
+                  <BookMarked className="h-8 w-8 text-primary" />
+                )}
               </div>
-            ))}
-          </div>
-        )}
+              <h2 className="text-xl font-semibold mb-2">
+                {showArchived ? "No archived subjects" : "No subjects yet"}
+              </h2>
+              <p className="text-muted-foreground mb-6 max-w-sm">
+                {showArchived
+                  ? "Archived subjects will appear here."
+                  : "Add subjects to organize your learning material for this goal."}
+              </p>
+            </div>
+          ) : null;
+        })()}
+
+        {!loading && (() => {
+          const filtered = showArchived
+            ? subjects.filter((s) => s.is_archived)
+            : subjects.filter((s) => !s.is_archived);
+          return filtered.length > 0 ? (
+            <div className="flex flex-col gap-3 max-w-2xl">
+              {filtered.map((subject, i) => (
+                <div
+                  key={subject.id}
+                  className="animate-card-enter"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  <SubjectCard
+                    subject={subject}
+                    goalId={goalId}
+                    onArchive={() => archiveSubject(subject.id, !subject.is_archived)}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null;
+        })()}
       </main>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, Pencil, Trash2, Copy, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Copy, ArrowUpDown, Archive, ArchiveRestore } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,6 +15,8 @@ interface ItemActionsMenuProps {
   onDelete: () => void;
   onDuplicate: () => void;
   onReorder: () => void;
+  onArchive?: () => void;
+  isArchived?: boolean;
   triggerClassName?: string;
 }
 
@@ -23,6 +25,8 @@ export function ItemActionsMenu({
   onDelete,
   onDuplicate,
   onReorder,
+  onArchive,
+  isArchived,
   triggerClassName,
 }: ItemActionsMenuProps) {
   return (
@@ -51,6 +55,19 @@ export function ItemActionsMenu({
           <ArrowUpDown className="h-3.5 w-3.5" />
           Reorder
         </DropdownMenuItem>
+        {onArchive && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onArchive}>
+              {isArchived ? (
+                <ArchiveRestore className="h-3.5 w-3.5" />
+              ) : (
+                <Archive className="h-3.5 w-3.5" />
+              )}
+              {isArchived ? "Unarchive" : "Archive"}
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={onDelete}>
           <Trash2 className="h-3.5 w-3.5" />

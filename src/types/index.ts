@@ -31,6 +31,7 @@ export interface Goal {
   description: string | null;
   target_exam: string | null;
   target_year: number | null;
+  is_archived: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +42,7 @@ export interface Subject {
   name: string;
   description: string | null;
   order: number;
+  is_archived: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -51,6 +53,7 @@ export interface Topic {
   name: string;
   description: string | null;
   order: number;
+  is_archived: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -171,12 +174,26 @@ export interface PaginatedResponse<T> {
   total_pages: number;
 }
 
+export interface Issue {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  page_url: string | null;
+  category: string;
+  status: string;
+  attachments: { original_name: string; disk_name: string; content_type: string; size: number }[];
+  resolved_at: string | null;
+  created_at: string;
+}
+
 export interface SubTopic {
   id: string;
   topic_id: string;
   name: string;
   description: string | null;
   order: number;
+  is_archived: boolean;
   revision_count: number;
   last_revised_at: string | null;
   confidence_level: number;

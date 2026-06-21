@@ -12,6 +12,7 @@ import {
   Calendar,
   ArrowUpCircle,
   ShieldAlert,
+  Archive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -70,7 +71,7 @@ export default function HomePage() {
 
 function HomeContent() {
   const { user } = useAuthStore();
-  const { goals, loading: goalsLoading, error: goalsError, fetchGoals, createGoal } = useGoalStore();
+  const { goals, loading: goalsLoading, error: goalsError, fetchGoals, createGoal, archiveGoal } = useGoalStore();
   const {
     overdue,
     dueToday,
@@ -87,14 +88,15 @@ function HomeContent() {
 
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [promotionPending, setPromotionPending] = useState<PromotionSuggestion | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     if (user) {
-      fetchGoals(user.id);
+      fetchGoals(user.id, showArchived);
       fetchGlobalQueue();
       fetchSettings();
     }
-  }, [user, fetchGoals, fetchGlobalQueue, fetchSettings]);
+  }, [user, fetchGoals, fetchGlobalQueue, fetchSettings, showArchived]);
 
   const handleCreateGoal = async (data: Record<string, string | number>) => {
     if (user) {
@@ -410,12 +412,23 @@ function HomeContent() {
                 Track and manage your learning objectives
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showArchived ? "secondary" : "outline"}
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => setShowArchived((v) => !v)}
+              >
+                <Archive className="h-3.5 w-3.5" />
+                {showArchived ? "Hide Archived" : "Show Archived"}
+              </Button>
             <CreateDialog
               title="Goal"
               description="Create a new learning goal to start organizing your study plan."
               fields={goalFields}
               onSubmit={handleCreateGoal}
             />
+            </div>
           </div>
 
           {goalsLoading && <CardGridSkeleton count={3} cardHeight="h-48" />}
@@ -426,31 +439,49 @@ function HomeContent() {
             </div>
           )}
 
-          {!goalsLoading && !goalsError && goals.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-4">
-                <Target className="h-7 w-7 text-primary" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">No goals yet</h3>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                Create your first learning goal to start organizing subjects, topics, and tracking progress.
-              </p>
-            </div>
-          )}
-
-          {!goalsLoading && goals.length > 0 && (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {goals.map((goal, i) => (
-                <div
-                  key={goal.id}
-                  className="animate-card-enter"
-                  style={{ animationDelay: `${i * 80}ms` }}
-                >
-                  <GoalCard goal={goal} />
+          {!goalsLoading && !goalsError && (() => {
+            const filtered = showArchived
+              ? goals.filter((g) => g.is_archived)
+              : goals.filter((g) => !g.is_archived);
+            return filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-4">
+                  {showArchived ? (
+                    <Archive className="h-7 w-7 text-muted-foreground" />
+                  ) : (
+                    <Target className="h-7 w-7 text-primary" />
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+                <h3 className="text-lg font-semibold mb-2">
+                  {showArchived ? "No archived goals" : "No goals yet"}
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  {showArchived
+                    ? "Archived goals will appear here."
+                    : "Create your first learning goal to start organizing subjects, topics, and tracking progress."}
+                </p>
+              </div>
+            ) : null;
+          })()}
+
+          {!goalsLoading && (() => {
+            const filtered = showArchived
+              ? goals.filter((g) => g.is_archived)
+              : goals.filter((g) => !g.is_archived);
+            return filtered.length > 0 ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {filtered.map((goal, i) => (
+                  <div
+                    key={goal.id}
+                    className="animate-card-enter"
+                    style={{ animationDelay: `${i * 80}ms` }}
+                  >
+                    <GoalCard goal={goal} onArchive={() => archiveGoal(goal.id, !goal.is_archived)} />
+                  </div>
+                ))}
+              </div>
+            ) : null;
+          })()}
         </div>
       </main>
     </div>

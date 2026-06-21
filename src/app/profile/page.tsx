@@ -37,7 +37,7 @@ interface ProfileStats {
 
 const MASTERY_COLORS: Record<string, { bar: string; label: string }> = {
   NOT_STARTED: { bar: "bg-gray-400", label: "Not Started" },
-  BEGINNER: { bar: "bg-red-500", label: "Beginner" },
+  BEGINNER: { bar: "bg-orange-400", label: "Beginner" },
   INTERMEDIATE: { bar: "bg-amber-500", label: "Intermediate" },
   ADVANCED: { bar: "bg-sky-500", label: "Advanced" },
   MASTERED: { bar: "bg-green-500", label: "Mastered" },

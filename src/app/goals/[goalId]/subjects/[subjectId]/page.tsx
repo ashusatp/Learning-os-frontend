@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Layers, Puzzle, GripVertical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Layers, Puzzle, GripVertical, PanelLeftClose, PanelLeftOpen, Archive } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -92,6 +92,7 @@ function SortableTopicItem({
   onDelete,
   onDuplicate,
   onReorder,
+  onArchive,
 }: {
   topic: Topic;
   index: number;
@@ -101,6 +102,7 @@ function SortableTopicItem({
   onDelete: () => void;
   onDuplicate: () => void;
   onReorder: () => void;
+  onArchive: () => void;
 }) {
   const {
     attributes,
@@ -194,6 +196,8 @@ function SortableTopicItem({
           onDelete={onDelete}
           onDuplicate={onDuplicate}
           onReorder={onReorder}
+          onArchive={onArchive}
+          isArchived={topic.is_archived}
           triggerClassName={
             isSelected
               ? "text-primary-foreground hover:bg-primary-foreground/20"
@@ -215,6 +219,7 @@ function SortableSubtopicItem({
   onDelete,
   onDuplicate,
   onReorder,
+  onArchive,
 }: {
   subtopic: SubTopic;
   index: number;
@@ -224,6 +229,7 @@ function SortableSubtopicItem({
   onDelete: () => void;
   onDuplicate: () => void;
   onReorder: () => void;
+  onArchive: () => void;
 }) {
   const {
     attributes,
@@ -254,6 +260,8 @@ function SortableSubtopicItem({
       onDelete={onDelete}
       onDuplicate={onDuplicate}
       onReorder={onReorder}
+      onArchive={onArchive}
+      isArchived={subtopic.is_archived}
     />
   );
 
@@ -336,6 +344,7 @@ function SubjectDetailContent() {
     duplicateTopic,
     reorderTopics,
     setTopics,
+    archiveTopic,
   } = useTopicStore();
   const {
     subtopics,
@@ -348,7 +357,11 @@ function SubjectDetailContent() {
     duplicateSubTopic,
     reorderSubTopics,
     setSubtopics,
+    archiveSubTopic,
   } = useSubTopicStore();
+
+  const [showArchivedTopics, setShowArchivedTopics] = useState(false);
+  const [showArchivedSubtopics, setShowArchivedSubtopics] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -407,8 +420,8 @@ function SubjectDetailContent() {
   }, [subjects, subjectId, setActiveSubject]);
 
   useEffect(() => {
-    if (subjectId) fetchTopics(subjectId);
-  }, [subjectId, fetchTopics]);
+    if (subjectId) fetchTopics(subjectId, showArchivedTopics);
+  }, [subjectId, fetchTopics, showArchivedTopics]);
 
   useEffect(() => {
     if (topics.length > 0 && !selectedTopic) {
@@ -418,9 +431,9 @@ function SubjectDetailContent() {
 
   useEffect(() => {
     if (selectedTopic) {
-      fetchSubTopics(selectedTopic.id);
+      fetchSubTopics(selectedTopic.id, showArchivedSubtopics);
     }
-  }, [selectedTopic, fetchSubTopics]);
+  }, [selectedTopic, fetchSubTopics, showArchivedSubtopics]);
 
   // --- Handlers ---
   const handleSelectTopic = (topic: Topic) => setSelectedTopic(topic);
@@ -457,6 +470,10 @@ function SubjectDetailContent() {
 
   const handleDuplicateTopic = async (topic: Topic) => {
     await duplicateTopic(subjectId, topic);
+  };
+
+  const handleArchiveTopic = async (topic: Topic) => {
+    await archiveTopic(topic.id, !topic.is_archived);
   };
 
   const handleReorderTopicOpen = (topic: Topic) => {
@@ -511,6 +528,10 @@ function SubjectDetailContent() {
 
   const handleDuplicateSubtopic = async (subtopic: SubTopic) => {
     if (selectedTopic) await duplicateSubTopic(selectedTopic.id, subtopic);
+  };
+
+  const handleArchiveSubtopic = async (subtopic: SubTopic) => {
+    if (selectedTopic) await archiveSubTopic(selectedTopic.id, subtopic.id, !subtopic.is_archived);
   };
 
   const handleReorderSubtopicOpen = (subtopic: SubTopic) => {
@@ -603,6 +624,17 @@ function SubjectDetailContent() {
                     Topics
                   </p>
                   <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setShowArchivedTopics((v) => !v)}
+                      className={`flex items-center justify-center h-7 w-7 rounded-md transition-colors ${
+                        showArchivedTopics
+                          ? "text-foreground bg-accent"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                      }`}
+                      title={showArchivedTopics ? "Hide archived" : "Show archived"}
+                    >
+                      <Archive className="h-3.5 w-3.5" />
+                    </button>
                     <CreateDialog
                       title="Topic"
                       description="Add a new topic to this subject."
@@ -632,7 +664,10 @@ function SubjectDetailContent() {
                       items={topics.map((t) => t.id)}
                       strategy={verticalListSortingStrategy}
                     >
-                      {topics.map((topic, i) => (
+                      {(showArchivedTopics
+                        ? topics.filter((t) => t.is_archived)
+                        : topics.filter((t) => !t.is_archived)
+                      ).map((topic, i) => (
                         <SortableTopicItem
                           key={topic.id}
                           topic={topic}
@@ -643,6 +678,7 @@ function SubjectDetailContent() {
                           onDelete={() => handleDeleteTopic(topic)}
                           onDuplicate={() => handleDuplicateTopic(topic)}
                           onReorder={() => handleReorderTopicOpen(topic)}
+                          onArchive={() => handleArchiveTopic(topic)}
                         />
                       ))}
                     </SortableContext>
@@ -693,6 +729,17 @@ function SubjectDetailContent() {
                       )}
                     </div>
                     <div className="shrink-0 ml-4 flex items-center gap-2">
+                      <button
+                        onClick={() => setShowArchivedSubtopics((v) => !v)}
+                        className={`flex items-center justify-center h-8 w-8 rounded-md transition-colors ${
+                          showArchivedSubtopics
+                            ? "text-foreground bg-accent"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                        }`}
+                        title={showArchivedSubtopics ? "Hide archived" : "Show archived"}
+                      >
+                        <Archive className="h-4 w-4" />
+                      </button>
                       <ViewModeSwitcher mode={viewMode} onChange={setViewMode} />
                       <CreateDialog
                         title="Subtopic"
@@ -713,59 +760,75 @@ function SubjectDetailContent() {
                       </div>
                     )}
 
-                    {!subtopicsLoading && !subtopicsError && subtopics.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in-up">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-3">
-                          <Puzzle className="h-7 w-7 text-primary" />
+                    {!subtopicsLoading && !subtopicsError && (() => {
+                      const filtered = showArchivedSubtopics
+                        ? subtopics.filter((st) => st.is_archived)
+                        : subtopics.filter((st) => !st.is_archived);
+                      return filtered.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in-up">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-3">
+                            {showArchivedSubtopics ? (
+                              <Archive className="h-7 w-7 text-muted-foreground" />
+                            ) : (
+                              <Puzzle className="h-7 w-7 text-primary" />
+                            )}
+                          </div>
+                          <h3 className="text-base font-semibold mb-1">
+                            {showArchivedSubtopics ? "No archived subtopics" : "No subtopics yet"}
+                          </h3>
+                          <p className="text-sm text-muted-foreground max-w-xs">
+                            {showArchivedSubtopics
+                              ? "Archived subtopics will appear here."
+                              : "Add subtopics to track mastery, revisions, and performance."}
+                          </p>
                         </div>
-                        <h3 className="text-base font-semibold mb-1">
-                          No subtopics yet
-                        </h3>
-                        <p className="text-sm text-muted-foreground max-w-xs">
-                          Add subtopics to track mastery, revisions, and
-                          performance.
-                        </p>
-                      </div>
-                    )}
+                      ) : null;
+                    })()}
 
-                    {!subtopicsLoading && subtopics.length > 0 && (
-                      <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleSubtopicDragEnd}
-                      >
-                        <SortableContext
-                          items={subtopics.map((st) => st.id)}
-                          strategy={
-                            viewMode === "grid"
-                              ? rectSortingStrategy
-                              : verticalListSortingStrategy
-                          }
+                    {!subtopicsLoading && (() => {
+                      const filtered = showArchivedSubtopics
+                        ? subtopics.filter((st) => st.is_archived)
+                        : subtopics.filter((st) => !st.is_archived);
+                      return filtered.length > 0 ? (
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleSubtopicDragEnd}
                         >
-                          <div
-                            className={
+                          <SortableContext
+                            items={filtered.map((st) => st.id)}
+                            strategy={
                               viewMode === "grid"
-                                ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-                                : "flex flex-col gap-2"
+                                ? rectSortingStrategy
+                                : verticalListSortingStrategy
                             }
                           >
-                            {subtopics.map((subtopic, i) => (
-                              <SortableSubtopicItem
-                                key={subtopic.id}
-                                subtopic={subtopic}
-                                index={i}
-                                viewMode={viewMode}
-                                onClick={() => handleOpenDetail(subtopic)}
-                                onEdit={() => handleEditSubtopic(subtopic)}
-                                onDelete={() => handleDeleteSubtopic(subtopic)}
-                                onDuplicate={() => handleDuplicateSubtopic(subtopic)}
-                                onReorder={() => handleReorderSubtopicOpen(subtopic)}
-                              />
-                            ))}
-                          </div>
-                        </SortableContext>
-                      </DndContext>
-                    )}
+                            <div
+                              className={
+                                viewMode === "grid"
+                                  ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+                                  : "flex flex-col gap-2"
+                              }
+                            >
+                              {filtered.map((subtopic, i) => (
+                                <SortableSubtopicItem
+                                  key={subtopic.id}
+                                  subtopic={subtopic}
+                                  index={i}
+                                  viewMode={viewMode}
+                                  onClick={() => handleOpenDetail(subtopic)}
+                                  onEdit={() => handleEditSubtopic(subtopic)}
+                                  onDelete={() => handleDeleteSubtopic(subtopic)}
+                                  onDuplicate={() => handleDuplicateSubtopic(subtopic)}
+                                  onReorder={() => handleReorderSubtopicOpen(subtopic)}
+                                  onArchive={() => handleArchiveSubtopic(subtopic)}
+                                />
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               )}

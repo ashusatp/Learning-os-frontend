@@ -7,7 +7,7 @@ interface TopicState {
   activeTopic: Topic | null;
   loading: boolean;
   error: string | null;
-  fetchTopics: (subjectId: string) => Promise<void>;
+  fetchTopics: (subjectId: string, includeArchived?: boolean) => Promise<void>;
   setActiveTopic: (topic: Topic) => void;
   createTopic: (subjectId: string, data: Partial<Topic>) => Promise<Topic>;
   updateTopic: (topicId: string, data: Partial<Topic>) => Promise<void>;
@@ -15,6 +15,7 @@ interface TopicState {
   duplicateTopic: (subjectId: string, topic: Topic) => Promise<Topic>;
   reorderTopics: (subjectId: string, orderedIds: string[]) => Promise<void>;
   setTopics: (topics: Topic[]) => void;
+  archiveTopic: (topicId: string, archive?: boolean) => Promise<void>;
 }
 
 export const useTopicStore = create<TopicState>((set) => ({
@@ -22,10 +23,12 @@ export const useTopicStore = create<TopicState>((set) => ({
   activeTopic: null,
   loading: false,
   error: null,
-  fetchTopics: async (subjectId) => {
+  fetchTopics: async (subjectId, includeArchived = false) => {
     set({ loading: true, error: null, topics: [] });
     try {
-      const res = await api.get(`/subjects/${subjectId}/topics`);
+      const res = await api.get(`/subjects/${subjectId}/topics`, {
+        params: includeArchived ? { include_archived: true } : undefined,
+      });
       set({ topics: res.data, loading: false });
     } catch (err: unknown) {
       const message =
@@ -69,4 +72,16 @@ export const useTopicStore = create<TopicState>((set) => ({
     });
   },
   setTopics: (topics) => set({ topics }),
+  archiveTopic: async (topicId, archive = true) => {
+    const topic = useTopicStore.getState().topics.find((t) => t.id === topicId);
+    const subjectId = topic?.subject_id || "_";
+    const res = await api.patch(`/subjects/${subjectId}/topics/${topicId}/archive`, null, {
+      params: { archive },
+    });
+    set((state) => ({
+      topics: state.topics.map((t) => (t.id === topicId ? res.data : t)),
+      activeTopic:
+        state.activeTopic?.id === topicId ? res.data : state.activeTopic,
+    }));
+  },
 }));

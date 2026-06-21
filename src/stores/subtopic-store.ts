@@ -12,7 +12,7 @@ interface SubTopicState {
   subtopics: SubTopic[];
   loading: boolean;
   error: string | null;
-  fetchSubTopics: (topicId: string) => Promise<void>;
+  fetchSubTopics: (topicId: string, includeArchived?: boolean) => Promise<void>;
   createSubTopic: (
     topicId: string,
     data: Partial<SubTopic>
@@ -48,16 +48,19 @@ interface SubTopicState {
   saveNotes: (topicId: string, subtopicId: string, data: SaveNotesData) => Promise<SubTopic>;
   uploadFile: (topicId: string, subtopicId: string, file: File) => Promise<SubtopicFile>;
   deleteFile: (topicId: string, subtopicId: string, fileId: string) => Promise<void>;
+  archiveSubTopic: (topicId: string, subtopicId: string, archive?: boolean) => Promise<void>;
 }
 
 export const useSubTopicStore = create<SubTopicState>((set) => ({
   subtopics: [],
   loading: false,
   error: null,
-  fetchSubTopics: async (topicId) => {
+  fetchSubTopics: async (topicId, includeArchived = false) => {
     set({ loading: true, error: null, subtopics: [] });
     try {
-      const res = await api.get(`/topics/${topicId}/subtopics`);
+      const res = await api.get(`/topics/${topicId}/subtopics`, {
+        params: includeArchived ? { include_archived: true } : undefined,
+      });
       set({ subtopics: res.data, loading: false });
     } catch (err: unknown) {
       const message =
@@ -160,5 +163,17 @@ export const useSubTopicStore = create<SubTopicState>((set) => ({
     await api.delete(
       `/topics/${topicId}/subtopics/${subtopicId}/files/${fileId}`,
     );
+  },
+  archiveSubTopic: async (topicId, subtopicId, archive = true) => {
+    const res = await api.patch(
+      `/topics/${topicId}/subtopics/${subtopicId}/archive`,
+      null,
+      { params: { archive } },
+    );
+    set((state) => ({
+      subtopics: state.subtopics.map((st) =>
+        st.id === subtopicId ? res.data : st
+      ),
+    }));
   },
 }));
