@@ -3,9 +3,16 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { BookMarked, CalendarCheck, Archive } from "lucide-react";
+import { BookMarked, CalendarCheck, Archive, HelpCircle, AlertTriangle, Plus, BookOpen } from "lucide-react";
 import { Header, BreadcrumbEntry } from "@/components/header";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { SubjectCard } from "@/components/subject-card";
 import { CreateDialog, FieldConfig } from "@/components/create-dialog";
 import { EditDialog } from "@/components/edit-dialog";
@@ -15,6 +22,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useGoalStore } from "@/stores/goal-store";
 import { useSubjectStore } from "@/stores/subject-store";
 import { LogMistakeDialog } from "@/components/log-mistake-dialog";
+import { CreateQuestionDialog } from "@/components/create-question-dialog";
 import { Subject } from "@/types";
 
 const subjectFields: FieldConfig[] = [
@@ -52,6 +60,9 @@ function GoalDetailContent() {
   const [showArchived, setShowArchived] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [subjectDialogOpen, setSubjectDialogOpen] = useState(false);
+  const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
+  const [mistakeDialogOpen, setMistakeDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user && goals.length === 0) {
@@ -116,18 +127,76 @@ function GoalDetailContent() {
               <Archive className="h-3.5 w-3.5" />
               {showArchived ? "Hide Archived" : "Show Archived"}
             </Button>
+
+            <div className="w-px h-6 bg-border" />
+
             <Link href={`/goals/${goalId}/revisions`}>
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <CalendarCheck className="h-4 w-4" />
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
+                <CalendarCheck className="h-3.5 w-3.5" />
                 Revisions
               </Button>
             </Link>
-            <LogMistakeDialog goalId={goalId} goalTitle={activeGoal?.title} />
+            <Link href={`/goals/${goalId}/questions`}>
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
+                <HelpCircle className="h-3.5 w-3.5" />
+                Questions
+              </Button>
+            </Link>
+            <Link href={`/goals/${goalId}/mistakes`}>
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Mistakes
+              </Button>
+            </Link>
+
+            <div className="w-px h-6 bg-border" />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button size="sm" className="gap-1.5 text-xs" />}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setSubjectDialogOpen(true)}>
+                  <BookOpen className="h-4 w-4" />
+                  Subject
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setQuestionDialogOpen(true)}>
+                  <HelpCircle className="h-4 w-4" />
+                  Question
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setMistakeDialogOpen(true)}>
+                  <AlertTriangle className="h-4 w-4" />
+                  Mistake
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <CreateDialog
               title="Subject"
               description="Add a new subject to this goal."
               fields={subjectFields}
               onSubmit={handleCreateSubject}
+              open={subjectDialogOpen}
+              onOpenChange={setSubjectDialogOpen}
+              hideTrigger
+            />
+            <CreateQuestionDialog
+              goalId={goalId}
+              goalTitle={activeGoal?.title}
+              open={questionDialogOpen}
+              onOpenChange={setQuestionDialogOpen}
+              hideTrigger
+            />
+            <LogMistakeDialog
+              goalId={goalId}
+              goalTitle={activeGoal?.title}
+              open={mistakeDialogOpen}
+              onOpenChange={setMistakeDialogOpen}
+              hideTrigger
             />
           </div>
         </div>

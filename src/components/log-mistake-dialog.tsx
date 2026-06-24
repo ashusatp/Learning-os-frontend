@@ -28,10 +28,15 @@ import { useMistakeStore } from "@/stores/mistake-store";
 import api from "@/lib/api";
 import { Subject, Topic, SubTopic, Question } from "@/types";
 
+const MISC_TOPIC = "__misc_topic__";
+
 interface LogMistakeDialogProps {
   goalId: string;
   goalTitle?: string;
   onLogged?: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 function StepIndicator({ step, current, label }: { step: number; current: number; label: string }) {
@@ -57,8 +62,10 @@ function StepIndicator({ step, current, label }: { step: number; current: number
   );
 }
 
-export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDialogProps) {
-  const [open, setOpen] = useState(false);
+export function LogMistakeDialog({ goalId, goalTitle, onLogged, open: controlledOpen, onOpenChange: controlledOnOpenChange, hideTrigger }: LogMistakeDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = controlledOnOpenChange ?? setInternalOpen;
   const { createMistake } = useMistakeStore();
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -104,16 +111,27 @@ export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDial
   }, [selectedSubjectId]);
 
   useEffect(() => {
-    if (selectedTopicId) {
+    if (selectedTopicId && selectedTopicId !== MISC_TOPIC) {
       setLoadingSubtopics(true);
       setSubtopics([]);
       setQuestions([]);
       setSelectedSubtopicId("");
       setSelectedQuestionId("");
       api.get(`/topics/${selectedTopicId}/subtopics`)
-        .then((res) => setSubtopics(res.data))
+        .then((res) => {
+          setSubtopics(res.data);
+          if (res.data.length === 1) {
+            setSelectedSubtopicId(res.data[0].id);
+          }
+        })
         .catch(() => {})
         .finally(() => setLoadingSubtopics(false));
+    } else if (selectedTopicId === MISC_TOPIC) {
+      setSubtopics([]);
+      setQuestions([]);
+      setSelectedSubtopicId("");
+      setSelectedQuestionId("");
+      setLoadingSubtopics(false);
     }
   }, [selectedTopicId]);
 
@@ -122,18 +140,43 @@ export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDial
       setLoadingQuestions(true);
       setQuestions([]);
       setSelectedQuestionId("");
-      api.get(`/subtopics/${selectedSubtopicId}/questions`)
-        .then((res) => setQuestions(res.data))
+      api.get(`/subtopics/${selectedSubtopicId}/questions`, { params: { page: 1, page_size: 100 } })
+        .then((res) => setQuestions(res.data.items ?? res.data))
         .catch(() => {})
         .finally(() => setLoadingQuestions(false));
+    } else {
+      setQuestions([]);
+      setSelectedQuestionId("");
     }
   }, [selectedSubtopicId]);
 
+  const findOrCreateMiscTopic = async (): Promise<string> => {
+    const topicsRes = await api.get(`/subjects/${selectedSubjectId}/topics`);
+    const existing = topicsRes.data.find((t: Topic) => t.name === "Miscellaneous");
+    if (existing) return existing.id;
+    const res = await api.post(`/subjects/${selectedSubjectId}/topics`, { name: "Miscellaneous" });
+    return res.data.id;
+  };
+
+  const findOrCreateMiscSubtopic = async (topicId: string): Promise<string> => {
+    const stRes = await api.get(`/topics/${topicId}/subtopics`);
+    const existing = stRes.data.find((st: SubTopic) => st.name === "Miscellaneous");
+    if (existing) return existing.id;
+    const res = await api.post(`/topics/${topicId}/subtopics`, { name: "Miscellaneous" });
+    return res.data.id;
+  };
+
   const handleSave = async (data: Parameters<typeof createMistake>[1]) => {
-    if (!selectedSubtopicId) return;
+    if (!selectedTopicId) return;
     setSaving(true);
     try {
-      await createMistake(selectedSubtopicId, data);
+      const topicId = selectedTopicId === MISC_TOPIC
+        ? await findOrCreateMiscTopic()
+        : selectedTopicId;
+
+      const subtopicId = selectedSubtopicId || await findOrCreateMiscSubtopic(topicId);
+
+      await createMistake(subtopicId, data);
       setOpen(false);
       resetState();
       onLogged?.();
@@ -153,19 +196,23 @@ export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDial
   };
 
   const selectedSubjectName = subjects.find((s) => s.id === selectedSubjectId)?.name;
-  const selectedTopicName = topics.find((t) => t.id === selectedTopicId)?.name;
+  const selectedTopicName = selectedTopicId === MISC_TOPIC ? "Miscellaneous" : topics.find((t) => t.id === selectedTopicId)?.name;
   const selectedSubtopicName = subtopics.find((st) => st.id === selectedSubtopicId)?.name;
   const selectedQuestion = questions.find((q) => q.id === selectedQuestionId);
+  const hasMiscTopic = topics.some((t) => t.name.toLowerCase() === "miscellaneous");
 
   // Current step for indicator
-  const currentStep = !selectedSubjectId ? 1 : !selectedTopicId ? 2 : !selectedSubtopicId ? 3 : 4;
+  const currentStep = !selectedSubjectId ? 1 : !selectedTopicId ? 2 : 3;
+  const canShowEditor = !!selectedTopicId && (selectedTopicId === MISC_TOPIC || !loadingSubtopics);
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetState(); }}>
-      <DialogTrigger render={<Button variant="destructive" size="sm" className="gap-1.5 text-xs" />}>
-        <AlertTriangle className="h-3.5 w-3.5" />
-        Log Mistake
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger render={<Button variant="destructive" size="sm" className="gap-1.5 text-xs" />}>
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Log Mistake
+        </DialogTrigger>
+      )}
       <DialogContent className="!fixed !inset-4 !top-4 !left-4 !translate-x-0 !translate-y-0 !w-auto !max-w-none sm:!max-w-none flex flex-col overflow-hidden !p-0 !gap-0">
         {/* Header with red accent */}
         <div className="bg-gradient-to-r from-red-50 via-orange-50 to-amber-50 dark:from-red-950/30 dark:via-orange-950/20 dark:to-amber-950/10 border-b px-6 py-4">
@@ -185,9 +232,7 @@ export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDial
               <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
               <StepIndicator step={2} current={currentStep} label="Topic" />
               <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
-              <StepIndicator step={3} current={currentStep} label="Subtopic" />
-              <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
-              <StepIndicator step={4} current={currentStep} label="Details" />
+              <StepIndicator step={3} current={currentStep} label="Details" />
             </div>
           </div>
         </div>
@@ -195,7 +240,7 @@ export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDial
         <div className="flex flex-col flex-1 min-h-0">
           {/* Location selectors */}
           <div className="border-b bg-muted/30 px-6 py-3">
-            <div className="grid grid-cols-4 gap-4">
+            <div className={`grid gap-4 ${subtopics.length > 1 || (selectedSubtopicId && questions.length > 0) ? "grid-cols-4" : selectedSubtopicId && questions.length === 0 ? "grid-cols-3" : "grid-cols-2"}`}>
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <BookOpen className="h-3 w-3" /> Subject
@@ -232,62 +277,65 @@ export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDial
                     {topics.map((t) => (
                       <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                     ))}
+                    {!hasMiscTopic && (
+                      <SelectItem value={MISC_TOPIC}>Miscellaneous</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText className="h-3 w-3" /> Subtopic
-                </Label>
-                <Select
-                  value={selectedSubtopicId}
-                  onValueChange={(v) => v && setSelectedSubtopicId(v)}
-                  disabled={!selectedTopicId}
-                >
-                  <SelectTrigger className="h-9 text-xs w-full">
-                    <span className="flex-1 text-left truncate">
-                      {selectedSubtopicName || (loadingSubtopics ? "Loading..." : "Select subtopic")}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subtopics.map((st) => (
-                      <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {subtopics.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="h-3 w-3" /> Subtopic
+                    <span className="text-muted-foreground/50 normal-case tracking-normal">(optional)</span>
+                  </Label>
+                  <Select
+                    value={selectedSubtopicId || "__none__"}
+                    onValueChange={(v) => setSelectedSubtopicId(!v || v === "__none__" ? "" : v)}
+                  >
+                    <SelectTrigger className="h-9 text-xs w-full">
+                      <span className="flex-1 text-left truncate">
+                        {selectedSubtopicName || "None"}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {subtopics.map((st) => (
+                        <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-              <div className="space-y-1.5">
-                <Label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <LinkIcon className="h-3 w-3" /> Question
-                  <span className="text-muted-foreground/50 normal-case tracking-normal">(optional)</span>
-                </Label>
-                <Select
-                  value={selectedQuestionId}
-                  onValueChange={(v) => v && setSelectedQuestionId(v)}
-                  disabled={!selectedSubtopicId || questions.length === 0}
-                >
-                  <SelectTrigger className="h-9 text-xs w-full">
-                    <span className="flex-1 text-left truncate">
-                      {selectedQuestion
-                        ? `Q${selectedQuestion.order + 1}: ${selectedQuestion.text_html.replace(/<[^>]*>/g, "").slice(0, 40)}`
-                        : loadingQuestions
-                          ? "Loading..."
-                          : questions.length === 0 && selectedSubtopicId
-                            ? "No questions"
-                            : "Select question"}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {questions.map((q) => (
-                      <SelectItem key={q.id} value={q.id}>
-                        Q{q.order + 1}: {q.text_html.replace(/<[^>]*>/g, "").slice(0, 50)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {selectedSubtopicId && questions.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <LinkIcon className="h-3 w-3" /> Question
+                    <span className="text-muted-foreground/50 normal-case tracking-normal">(optional)</span>
+                  </Label>
+                  <Select
+                    value={selectedQuestionId}
+                    onValueChange={(v) => v && setSelectedQuestionId(v)}
+                  >
+                    <SelectTrigger className="h-9 text-xs w-full">
+                      <span className="flex-1 text-left truncate">
+                        {selectedQuestion
+                          ? `Q${selectedQuestion.order + 1}: ${selectedQuestion.text_html.replace(/<[^>]*>/g, "").slice(0, 40)}`
+                          : "Select question"}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {questions.map((q) => (
+                        <SelectItem key={q.id} value={q.id}>
+                          Q{q.order + 1}: {q.text_html.replace(/<[^>]*>/g, "").slice(0, 50)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             {/* Breadcrumb of selection */}
@@ -317,7 +365,7 @@ export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDial
           </div>
 
           {/* Editor area */}
-          {selectedSubtopicId ? (
+          {canShowEditor ? (
             <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
               <MistakeEditor
                 questionId={selectedQuestionId || null}
@@ -326,9 +374,9 @@ export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDial
                 saving={saving}
                 aiHierarchy={{
                   goal: goalTitle,
-                  subject: subjects.find((s) => s.id === selectedSubjectId)?.name,
-                  topic: topics.find((t) => t.id === selectedTopicId)?.name,
-                  subtopic: subtopics.find((st) => st.id === selectedSubtopicId)?.name,
+                  subject: selectedSubjectName,
+                  topic: selectedTopicName,
+                  subtopic: selectedSubtopicName,
                 }}
               />
             </div>
@@ -345,12 +393,10 @@ export function LogMistakeDialog({ goalId, goalTitle, onLogged }: LogMistakeDial
                 <p className="text-sm font-medium text-muted-foreground">
                   {!selectedSubjectId
                     ? "Select a subject to get started"
-                    : !selectedTopicId
-                      ? "Now pick a topic"
-                      : "Almost there — select a subtopic"}
+                    : "Now pick a topic"}
                 </p>
                 <p className="text-xs text-muted-foreground/60 mt-0.5">
-                  Navigate to the exact location where the mistake occurred
+                  Navigate to the location where the mistake occurred
                 </p>
               </div>
             </div>

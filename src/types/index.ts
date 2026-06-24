@@ -137,6 +137,14 @@ export interface Question {
   updated_at: string;
 }
 
+export interface GoalQuestion extends Question {
+  subject_id: string;
+  subject_name: string;
+  topic_id: string;
+  topic_name: string;
+  subtopic_name: string;
+}
+
 export type MistakeType =
   | "CONCEPTUAL"
   | "SILLY"
@@ -159,6 +167,14 @@ export interface Mistake {
   last_revised_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface GoalMistake extends Mistake {
+  subject_id: string;
+  subject_name: string;
+  topic_id: string;
+  topic_name: string;
+  subtopic_name: string;
 }
 
 export interface SubtopicStats {

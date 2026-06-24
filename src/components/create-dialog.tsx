@@ -33,6 +33,9 @@ interface CreateDialogProps {
   triggerLabel?: string;
   triggerVariant?: "default" | "outline" | "secondary" | "ghost";
   triggerSize?: "default" | "xs" | "sm" | "lg";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 export function CreateDialog({
@@ -43,8 +46,13 @@ export function CreateDialog({
   triggerLabel,
   triggerVariant = "outline",
   triggerSize = "sm",
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  hideTrigger,
 }: CreateDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = controlledOnOpenChange ?? setInternalOpen;
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,10 +79,12 @@ export function CreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant={triggerVariant} size={triggerSize} />}>
-        <Plus className="h-4 w-4" />
-        {triggerLabel || `Add ${title}`}
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger render={<Button variant={triggerVariant} size={triggerSize} />}>
+          <Plus className="h-4 w-4" />
+          {triggerLabel || `Add ${title}`}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
