@@ -368,3 +368,96 @@ export interface UserRevisionSettings {
   created_at: string;
   updated_at: string;
 }
+
+// ── Revision Campaigns ──
+
+export type CampaignType = "SUBTOPIC_REVISION" | "MISTAKE_REVIEW" | "PYQ_PRACTICE";
+export type CampaignScopeType = "SUBJECT" | "TOPIC";
+export type CampaignStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED";
+
+export interface CampaignScope {
+  id: string;
+  scope_type: CampaignScopeType;
+  subject_id: string;
+  topic_id: string | null;
+  subject_name: string | null;
+  topic_name: string | null;
+}
+
+export interface Campaign {
+  id: string;
+  user_id: string;
+  name: string;
+  campaign_type: CampaignType;
+  status: CampaignStatus;
+  total_days: number;
+  daily_frequency: number;
+  parallel_subjects: number;
+  start_date: string;
+  end_date: string;
+  total_items: number;
+  completed_items: number;
+  created_at: string;
+  updated_at: string;
+  scopes?: CampaignScope[];
+}
+
+export interface CampaignItem {
+  id: string;
+  campaign_id: string;
+  subtopic_id: string | null;
+  mistake_id: string | null;
+  question_id: string | null;
+  scheduled_date: string;
+  order_in_day: number;
+  is_completed: boolean;
+  completed_at: string | null;
+  notes: string | null;
+  subtopic_name: string | null;
+  topic_name: string | null;
+  subject_name: string | null;
+  mistake_description: string | null;
+  question_text: string | null;
+}
+
+// ── Campaign Preview ──
+
+export interface PreviewDayItem {
+  subtopic_id: string | null;
+  subtopic_name: string | null;
+  topic_name: string | null;
+  subject_name: string | null;
+  mistake_id: string | null;
+  question_id: string | null;
+}
+
+export interface PreviewDay {
+  date: string;
+  day_number: number;
+  items: PreviewDayItem[];
+}
+
+export interface SubjectSummary {
+  subject_id: string;
+  subject_name: string;
+  subtopic_count: number;
+}
+
+export interface CampaignPreview {
+  total_items: number;
+  total_days: number;
+  daily_frequency: number;
+  parallel_subjects: number;
+  subjects: SubjectSummary[];
+  schedule: PreviewDay[];
+}
+
+export interface CampaignQueue {
+  campaign_id: string;
+  campaign_name: string;
+  campaign_type: CampaignType;
+  scheduled_date: string;
+  items: CampaignItem[];
+  total_for_day: number;
+  completed_for_day: number;
+}

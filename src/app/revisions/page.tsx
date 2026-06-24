@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import {
   Calendar,
   Clock,
@@ -11,14 +12,19 @@ import {
   ArrowUpCircle,
   ShieldAlert,
   Filter,
+  BookOpen,
+  Target,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { AuthGuard } from "@/components/auth-guard";
 import { RevisionCard } from "@/components/revision-card";
 import { useRevisionStore } from "@/stores/revision-store";
+import { useCampaignStore } from "@/stores/campaign-store";
 import { useGoalStore } from "@/stores/goal-store";
 import { useAuthStore } from "@/stores/auth-store";
 import {
@@ -30,7 +36,8 @@ import {
 import { RevisionCalendar } from "@/components/revision-calendar";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { CalendarCompletedItem, CalendarDateItems, PromotionSuggestion, QualityRating, RevisionQueueItem } from "@/types";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CalendarCompletedItem, CalendarDateItems, CampaignItem, CampaignQueue, CampaignType, PromotionSuggestion, QualityRating, RevisionQueueItem } from "@/types";
 import { toast } from "sonner";
 import api from "@/lib/api";
 
@@ -59,8 +66,15 @@ function GlobalRevisionsContent() {
     pauseRevision,
     promoteMastery,
   } = useRevisionStore();
+  const {
+    todaysQueue,
+    fetchTodaysQueue,
+    completeItem: completeCampaignItem,
+  } = useCampaignStore();
 
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [completingCampaignItemId, setCompletingCampaignItemId] = useState<string | null>(null);
+  const [confirmCampaignItemId, setConfirmCampaignItemId] = useState<string | null>(null);
   const [promotionPending, setPromotionPending] = useState<PromotionSuggestion | null>(null);
   const [goalFilter, setGoalFilter] = useState<string>("all");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -99,8 +113,9 @@ function GlobalRevisionsContent() {
       fetchGoals(user.id);
       fetchGlobalQueue();
       fetchSettings();
+      fetchTodaysQueue();
     }
-  }, [user, fetchGoals, fetchGlobalQueue, fetchSettings]);
+  }, [user, fetchGoals, fetchGlobalQueue, fetchSettings, fetchTodaysQueue]);
 
   const filterItems = useCallback(
     (items: RevisionQueueItem[]) => {
@@ -169,6 +184,20 @@ function GlobalRevisionsContent() {
       await pauseRevision(scheduleId);
     },
     [pauseRevision]
+  );
+
+  const handleCompleteCampaignItem = useCallback(
+    async (itemId: string) => {
+      setCompletingCampaignItemId(itemId);
+      try {
+        await completeCampaignItem(itemId);
+        toast.success("Item completed!");
+      } catch {
+        toast.error("Failed to complete item");
+      }
+      setCompletingCampaignItemId(null);
+    },
+    [completeCampaignItem]
   );
 
   // Get unique goals from queue items for filter dropdown
@@ -431,7 +460,7 @@ function GlobalRevisionsContent() {
                       <CompletedSection items={dateItems.completed} />
                     )}
 
-                    {isEmpty && isSelectedToday && (!dateItems || dateItems.completed.length === 0) && (
+                    {isEmpty && isSelectedToday && (!dateItems || dateItems.completed.length === 0) && todaysQueue.length === 0 && (
                       <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
                         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                           <CheckCircle2 className="h-8 w-8 text-green-500" />
@@ -443,6 +472,32 @@ function GlobalRevisionsContent() {
                         </p>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Campaign Queues */}
+                {todaysQueue.length > 0 && (
+                  <div className="space-y-4 mt-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-primary" />
+                        <h2 className="text-sm font-semibold">Campaign Revisions</h2>
+                      </div>
+                      <Link
+                        href="/campaigns"
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        View all campaigns →
+                      </Link>
+                    </div>
+                    {todaysQueue.map((queue) => (
+                      <CampaignQueueSection
+                        key={queue.campaign_id}
+                        queue={queue}
+                        onComplete={setConfirmCampaignItemId}
+                        completingId={completingCampaignItemId}
+                      />
+                    ))}
                   </div>
                 )}
               </>
@@ -488,6 +543,18 @@ function GlobalRevisionsContent() {
           </div>
         </div>
       </main>
+
+      <ConfirmDialog
+        open={!!confirmCampaignItemId}
+        onOpenChange={(open) => { if (!open) setConfirmCampaignItemId(null); }}
+        title="Mark as done?"
+        description="This item will be marked as completed. This action can't be undone."
+        confirmLabel="Mark Done"
+        onConfirm={() => {
+          if (confirmCampaignItemId) handleCompleteCampaignItem(confirmCampaignItemId);
+        }}
+        loading={!!completingCampaignItemId}
+      />
     </div>
     </TooltipProvider>
   );
@@ -699,6 +766,162 @@ function QueueSection({
             completing={completingId === item.schedule_id}
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+const CAMPAIGN_TYPE_META: Record<CampaignType, { label: string; icon: React.ReactNode }> = {
+  SUBTOPIC_REVISION: { label: "Subtopic Revision", icon: <BookOpen className="h-3.5 w-3.5" /> },
+  MISTAKE_REVIEW: { label: "Mistake Review", icon: <AlertTriangle className="h-3.5 w-3.5" /> },
+  PYQ_PRACTICE: { label: "PYQ Practice", icon: <Target className="h-3.5 w-3.5" /> },
+};
+
+function CampaignQueueSection({
+  queue,
+  onComplete,
+  completingId,
+}: {
+  queue: CampaignQueue;
+  onComplete: (itemId: string) => void;
+  completingId: string | null;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const meta = CAMPAIGN_TYPE_META[queue.campaign_type];
+  const pendingItems = queue.items.filter((i) => !i.is_completed);
+  const doneItems = queue.items.filter((i) => i.is_completed);
+  const allDone = pendingItems.length === 0 && doneItems.length > 0;
+
+  return (
+    <div className="rounded-lg border bg-card overflow-hidden">
+      {/* Header */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
+      >
+        {expanded ? (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        )}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {meta.icon}
+          <span className="text-sm font-semibold truncate">{queue.campaign_name}</span>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+            {meta.label}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {queue.completed_for_day}/{queue.total_for_day}
+          </span>
+          {allDone && <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />}
+        </div>
+      </button>
+
+      {/* Progress bar */}
+      <div className="px-4">
+        <Progress
+          value={queue.total_for_day > 0 ? (queue.completed_for_day / queue.total_for_day) * 100 : 0}
+          className="h-1"
+        />
+      </div>
+
+      {/* Items */}
+      {expanded && (
+        <div className="px-4 py-3 space-y-2">
+          {pendingItems.map((item) => (
+            <CampaignQueueItemCard
+              key={item.id}
+              item={item}
+              campaignType={queue.campaign_type}
+              onComplete={onComplete}
+              completing={completingId === item.id}
+            />
+          ))}
+          {doneItems.map((item) => (
+            <CampaignQueueItemCard
+              key={item.id}
+              item={item}
+              campaignType={queue.campaign_type}
+              onComplete={onComplete}
+              completing={false}
+            />
+          ))}
+          {queue.items.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-2">
+              No items scheduled for today
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CampaignQueueItemCard({
+  item,
+  campaignType,
+  onComplete,
+  completing,
+}: {
+  item: CampaignItem;
+  campaignType: CampaignType;
+  onComplete: (id: string) => void;
+  completing: boolean;
+}) {
+  const title =
+    campaignType === "SUBTOPIC_REVISION"
+      ? item.subtopic_name
+      : campaignType === "MISTAKE_REVIEW"
+      ? item.subtopic_name || "Mistake"
+      : item.subtopic_name || "PYQ";
+
+  const subtitle =
+    [item.subject_name, item.topic_name].filter(Boolean).join(" › ") || "";
+
+  return (
+    <div
+      className={`rounded-lg border px-3 py-2.5 transition-colors ${
+        item.is_completed
+          ? "border-l-4 border-l-green-500 opacity-60"
+          : "border-l-4 border-l-violet-500"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            {item.is_completed ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+            ) : (
+              <Clock className="h-3.5 w-3.5 text-violet-500 shrink-0" />
+            )}
+            <span
+              className={`text-sm font-medium truncate ${
+                item.is_completed ? "line-through text-muted-foreground" : ""
+              }`}
+            >
+              {title}
+            </span>
+          </div>
+          {subtitle && (
+            <span className="text-[11px] text-muted-foreground ml-[22px]">
+              {subtitle}
+            </span>
+          )}
+        </div>
+
+        {!item.is_completed && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs shrink-0"
+            onClick={() => onComplete(item.id)}
+            disabled={completing}
+          >
+            {completing ? "..." : "Done"}
+          </Button>
+        )}
       </div>
     </div>
   );

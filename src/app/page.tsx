@@ -403,6 +403,24 @@ function HomeContent() {
           </div>
         </div>
 
+        {/* ── Campaigns Quick Link ── */}
+        <div className="border-t pt-6 pb-2 mb-4">
+          <Link href="/campaigns">
+            <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer">
+              <div className="flex items-center gap-3">
+                <Calendar className="h-5 w-5 text-violet-500" />
+                <div>
+                  <p className="text-sm font-medium">Revision Campaigns</p>
+                  <p className="text-xs text-muted-foreground">
+                    Custom revision schedules for subjects, mistakes & PYQs
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </Link>
+        </div>
+
         {/* ── Goals Section ── */}
         <div className="border-t pt-8">
           <div className="flex items-center justify-between mb-6">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, LogOut, Sun, Moon, User as UserIcon, Bug } from "lucide-react";
+import { BookOpen, LogOut, Sun, Moon, User as UserIcon, Bug, Plus, Target, Calendar } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
   DropdownMenu,
@@ -87,7 +87,26 @@ export function Header({ breadcrumbs }: HeaderProps) {
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-lg border border-dashed border-muted-foreground/40 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm hover:border-primary hover:text-primary hover:bg-primary/5 hover:shadow-md transition-all focus:outline-none">
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Create</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => router.push("/")}>
+                  <Target className="mr-2 h-4 w-4" />
+                  New Goal
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/campaigns/new")}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  New Campaign
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <button
             onClick={toggleTheme}
             className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
