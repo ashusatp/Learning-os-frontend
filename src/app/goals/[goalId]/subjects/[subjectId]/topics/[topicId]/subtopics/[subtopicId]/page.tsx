@@ -45,6 +45,7 @@ import { Header, BreadcrumbEntry } from "@/components/header";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { Whiteboard } from "@/components/whiteboard";
 import { SketchBoard } from "@/components/sketchboard";
+import { SketchBoardManager } from "@/components/sketch-board-manager";
 import { FileManager } from "@/components/file-manager";
 import { SubtopicNotesViewer } from "@/components/subtopic-notes-viewer";
 import { QuestionList } from "@/components/question-list";
@@ -257,7 +258,7 @@ function SubtopicDetailContent() {
     { label: subtopic?.name || "Subtopic" },
   ];
 
-  const hasSketch = !!sketchDataUrl;
+  const hasSketchBoards = (subtopic?.sketch_boards?.length ?? 0) > 0;
   const hasWhiteboard = !!whiteboardDataUrl;
   const hasFiles = (subtopic?.files?.length ?? 0) > 0;
   const questionCount = questionTotal;
@@ -267,7 +268,7 @@ function SubtopicDetailContent() {
   // Content availability flags for badge dots
   const tabHasContent: Partial<Record<Tab, boolean>> = {
     notes: !!notesHtml && notesHtml !== "<p></p>",
-    sketchboard: hasSketch,
+    sketchboard: hasSketchBoards,
     whiteboard: hasWhiteboard,
     questions: questionCount > 0,
     mistakes: mistakeTotal > 0,
@@ -288,12 +289,15 @@ function SubtopicDetailContent() {
           </div>
         );
       case "sketchboard":
-        return sketchDataUrl ? (
+        return (
           <div className="h-full">
-            <SketchBoard initialData={sketchDataUrl} readOnly onFullscreen={() => setFullscreen("sketch")} />
+            <SketchBoardManager
+              topicId={topicId}
+              subtopicId={subtopicId}
+              readOnly
+              onFullscreen={() => setFullscreen("sketch")}
+            />
           </div>
-        ) : (
-          <EmptyState message="No sketch yet. Switch to edit mode to start drawing." />
         );
       case "whiteboard":
         return whiteboardDataUrl ? (
@@ -469,9 +473,9 @@ function SubtopicDetailContent() {
 
                 {activeTab === "sketchboard" && initialised && fullscreen !== "sketch" && (
                   <div className="h-full">
-                    <SketchBoard
-                      initialData={sketchDataUrl}
-                      onChange={setSketchDataUrl}
+                    <SketchBoardManager
+                      topicId={topicId}
+                      subtopicId={subtopicId}
                       onFullscreen={() => setFullscreen("sketch")}
                     />
                   </div>
@@ -553,18 +557,12 @@ function SubtopicDetailContent() {
         <FullscreenOverlay
           title="Sketchboard"
           onClose={() => setFullscreen(null)}
-          onSave={mode === "edit" ? handleSave : undefined}
-          saving={isSaving}
-          dirty={isDirty}
         >
-          {mode === "edit" ? (
-            <SketchBoard
-              initialData={sketchDataUrl}
-              onChange={setSketchDataUrl}
-            />
-          ) : (
-            <SketchBoard initialData={sketchDataUrl} readOnly />
-          )}
+          <SketchBoardManager
+            topicId={topicId}
+            subtopicId={subtopicId}
+            readOnly={mode !== "edit"}
+          />
         </FullscreenOverlay>
       )}
     </div>

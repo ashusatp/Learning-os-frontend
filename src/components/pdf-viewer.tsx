@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -20,6 +20,78 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+// Lazy thumbnail that only renders when visible in the viewport
+const LazyThumbnail = memo(function LazyThumbnail({
+  pageNum,
+  isActive,
+  onGoToPage,
+  thumbRef,
+}: {
+  pageNum: number;
+  isActive: boolean;
+  onGoToPage: (page: number) => void;
+  thumbRef: (el: HTMLButtonElement | null) => void;
+}) {
+  const [isVisible, setIsVisible] = useState(false);
+  const sentinelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <button
+      ref={(el) => {
+        (sentinelRef as React.MutableRefObject<HTMLButtonElement | null>).current = el;
+        thumbRef(el);
+      }}
+      onClick={() => onGoToPage(pageNum)}
+      className={`relative w-full rounded-md overflow-hidden border-2 transition-colors cursor-pointer mb-2 ${
+        isActive
+          ? "border-primary ring-1 ring-primary/30"
+          : "border-transparent hover:border-muted-foreground/30"
+      }`}
+    >
+      {isVisible ? (
+        <Page
+          pageNumber={pageNum}
+          width={148}
+          renderTextLayer={false}
+          renderAnnotationLayer={false}
+          loading={
+            <div className="flex items-center justify-center h-[180px] bg-muted/20">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          }
+        />
+      ) : (
+        <div className="flex items-center justify-center h-[180px] bg-muted/10" />
+      )}
+      <span
+        className={`absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] px-1.5 py-0.5 rounded-full ${
+          isActive
+            ? "bg-primary text-primary-foreground"
+            : "bg-black/50 text-white"
+        }`}
+      >
+        {pageNum}
+      </span>
+    </button>
+  );
+});
 
 interface PdfViewerProps {
   src: string;
@@ -226,41 +298,16 @@ export default function PdfViewer({ src, fileName, onDownload, onClose }: PdfVie
             <Document file={src}>
               {Array.from({ length: numPages }, (_, i) => {
                 const pageNum = i + 1;
-                const isActive = pageNum === currentPage;
                 return (
-                  <button
+                  <LazyThumbnail
                     key={pageNum}
-                    ref={(el) => {
+                    pageNum={pageNum}
+                    isActive={pageNum === currentPage}
+                    onGoToPage={goToPage}
+                    thumbRef={(el) => {
                       if (el) thumbnailRefs.current.set(pageNum, el);
                     }}
-                    onClick={() => goToPage(pageNum)}
-                    className={`relative w-full rounded-md overflow-hidden border-2 transition-colors cursor-pointer mb-2 ${
-                      isActive
-                        ? "border-primary ring-1 ring-primary/30"
-                        : "border-transparent hover:border-muted-foreground/30"
-                    }`}
-                  >
-                    <Page
-                      pageNumber={pageNum}
-                      width={148}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                      loading={
-                        <div className="flex items-center justify-center h-[180px] bg-muted/20">
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        </div>
-                      }
-                    />
-                    <span
-                      className={`absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] px-1.5 py-0.5 rounded-full ${
-                        isActive
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-black/50 text-white"
-                      }`}
-                    >
-                      {pageNum}
-                    </span>
-                  </button>
+                  />
                 );
               })}
             </Document>

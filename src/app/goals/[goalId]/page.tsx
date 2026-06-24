@@ -8,12 +8,14 @@ import { Header, BreadcrumbEntry } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { SubjectCard } from "@/components/subject-card";
 import { CreateDialog, FieldConfig } from "@/components/create-dialog";
+import { EditDialog } from "@/components/edit-dialog";
 import { SubjectListSkeleton } from "@/components/page-skeleton";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuthStore } from "@/stores/auth-store";
 import { useGoalStore } from "@/stores/goal-store";
 import { useSubjectStore } from "@/stores/subject-store";
 import { LogMistakeDialog } from "@/components/log-mistake-dialog";
+import { Subject } from "@/types";
 
 const subjectFields: FieldConfig[] = [
   {
@@ -45,9 +47,11 @@ function GoalDetailContent() {
 
   const { user } = useAuthStore();
   const { activeGoal, goals, setActiveGoal, fetchGoals } = useGoalStore();
-  const { subjects, loading, error, fetchSubjects, createSubject, archiveSubject } =
+  const { subjects, loading, error, fetchSubjects, createSubject, updateSubject, deleteSubject, archiveSubject } =
     useSubjectStore();
   const [showArchived, setShowArchived] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
 
   useEffect(() => {
     if (user && goals.length === 0) {
@@ -68,6 +72,21 @@ function GoalDetailContent() {
     data: Record<string, string | number>
   ) => {
     await createSubject(goalId, data);
+  };
+
+  const handleEditSubject = (subject: Subject) => {
+    setEditingSubject(subject);
+    setEditOpen(true);
+  };
+
+  const handleSaveEditSubject = async (data: Record<string, string | number>) => {
+    if (editingSubject) {
+      await updateSubject(editingSubject.id, data);
+    }
+  };
+
+  const handleDeleteSubject = async (subjectId: string) => {
+    await deleteSubject(subjectId);
   };
 
   const breadcrumbs: BreadcrumbEntry[] = [
@@ -151,7 +170,7 @@ function GoalDetailContent() {
             ? subjects.filter((s) => s.is_archived)
             : subjects.filter((s) => !s.is_archived);
           return filtered.length > 0 ? (
-            <div className="flex flex-col gap-3 max-w-2xl">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((subject, i) => (
                 <div
                   key={subject.id}
@@ -161,6 +180,8 @@ function GoalDetailContent() {
                   <SubjectCard
                     subject={subject}
                     goalId={goalId}
+                    onEdit={() => handleEditSubject(subject)}
+                    onDelete={() => handleDeleteSubject(subject.id)}
                     onArchive={() => archiveSubject(subject.id, !subject.is_archived)}
                   />
                 </div>
@@ -169,6 +190,21 @@ function GoalDetailContent() {
           ) : null;
         })()}
       </main>
+
+      {editingSubject && (
+        <EditDialog
+          title="Subject"
+          description="Update this subject's details."
+          fields={subjectFields}
+          initialData={{
+            name: editingSubject.name,
+            description: editingSubject.description,
+          }}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onSubmit={handleSaveEditSubject}
+        />
+      )}
     </div>
   );
 }

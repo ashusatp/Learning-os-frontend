@@ -89,6 +89,16 @@ export interface FolderContents {
   files: SubtopicFile[];
 }
 
+export interface SketchBoard {
+  id: string;
+  subtopic_id: string;
+  name: string;
+  data: string | null;
+  order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type QuestionType =
   | "SINGLE_MCQ"
   | "MULTI_MCQ"
@@ -207,6 +217,7 @@ export interface SubTopic {
   sketch_data_url: string | null;
   whiteboard_data_url: string | null;
   files: SubtopicFile[];
+  sketch_boards: SketchBoard[];
   created_at: string;
   updated_at: string;
 }
