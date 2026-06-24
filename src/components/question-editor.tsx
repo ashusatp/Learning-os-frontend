@@ -369,7 +369,7 @@ export function QuestionEditor({ question, onSave, onCancel, saving, aiHierarchy
         { text_html: "<p>False</p>", is_correct: false, order: 1 },
       ];
     } else if (type === "SINGLE_MCQ" || type === "MULTI_MCQ") {
-      if (form.options.length < 2) {
+      if (form.question_type === "TRUE_FALSE" || form.options.length < 2) {
         newForm.options = [
           { text_html: "", is_correct: false, order: 0 },
           { text_html: "", is_correct: false, order: 1 },
